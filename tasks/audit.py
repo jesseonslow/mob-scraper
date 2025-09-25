@@ -7,54 +7,6 @@ from file_system import get_master_php_urls, index_entries_by_url, index_entries
 from reporting import generate_html_report, update_index_page
 from tasks.utils import get_contextual_data
 
-# We need this helper function from scrape_new to determine if a missing
-# file has enough context to be created.
-def _get_contextual_data(missing_url, existing_species, existing_genera_by_url, existing_genera_by_slug):
-    """
-    Finds a neighboring or parent entry to provide context for a missing species.
-    This version includes improved logic for handling ..._XX_1.php genus URLs.
-   
-    """
-    url_pattern = re.compile(r'(.+)_(\d+)_(\d+)\.php$')
-    match = url_pattern.search(missing_url)
-    if not match: return None
-    base, major, minor = match.groups()
-
-    # --- NEW LOGIC FLOW ---
-
-    # 1. Self-Referential Check: Handle cases where the species URL is also a genus URL.
-    if missing_url in existing_genera_by_url:
-        return 'self-referential genus'
-
-    # 2. Species Neighbor Check: Look for a preceding species file (e.g., ..._5_3.php for ..._5_4.php)
-    neighbor_minor = int(minor) - 1
-    if neighbor_minor > 0:
-        neighbor_url = f"{base}_{major}_{neighbor_minor}.php"
-        if neighbor_url in existing_species:
-             return 'species neighbor'
-
-    # 3. Unusual Genus URL Check: Look for a genus at ..._XX_1.php
-    # This is the key fix for cases like geometrini_54_2.php
-    genus_url_format1 = f"{base}_{major}_1.php"
-    if genus_url_format1 in existing_genera_by_url:
-        return 'genus by unusual URL'
-
-    # 4. Standard Genus URL Check: Look for a genus at ..._XX.php
-    genus_url_format2 = f"{base}_{major}.php"
-    if genus_url_format2 in existing_genera_by_url:
-        return 'genus by standard URL'
-
-    # 5. Book 4 Fallback: Look for genus by subdirectory slug
-    if '/part-4/' in missing_url:
-        try:
-            genus_slug = missing_url.split('/part-4/', 1)[1].split('/')[0]
-            if genus_slug in existing_genera_by_slug:
-                return 'genus by slug'
-        except IndexError:
-            pass
-    
-    return None
-
 def run_audit():
     """
     Runs a comprehensive audit on the content, checking for both missing files
