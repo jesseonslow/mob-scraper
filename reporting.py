@@ -6,8 +6,8 @@ from pathlib import Path
 from html import escape
 from bs4 import BeautifulSoup
 
-# Import the REPORT_DIR from config
-from config import REPORT_DIR
+from config import REPORT_DIR, MARKDOWN_DIR
+from file_system import get_master_php_urls, index_entries_by_url
 
 INDEX_TEMPLATE = """
 <!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>Scraper Reports Index</title>
@@ -15,6 +15,10 @@ INDEX_TEMPLATE = """
     body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; line-height: 1.6; margin: 0; background-color: #f9f9f9; color: #333; }}
     .container {{ max-width: 900px; margin: 2em auto; padding: 0 1em; }}
     h1 {{ color: #333; border-bottom: 2px solid #eee; padding-bottom: 0.5em; }}
+    .summary-stats {{ background: #fff; border: 1px solid #ddd; padding: 1.5em; margin-bottom: 2em; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }}
+    .progress-bar {{ background-color: #e9ecef; border-radius: .25rem; height: 2rem; display: flex; overflow: hidden; font-size: .75rem; }}
+    .progress-bar-inner {{ background-color: #28a745; display: flex; flex-direction: column; justify-content: center; color: #fff; text-align: center; white-space: nowrap; transition: width .6s ease; font-weight: bold; font-size: 1rem; }}
+    .stats-label {{ margin-top: 0.5rem; text-align: right; color: #555; font-size: 0.9em; }}
     .report-item {{ background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 2em; overflow: hidden; }}
     .report-header {{ background-color: #f7f7f7; padding: 1em 1.5em; border-bottom: 1px solid #eee; }}
     .report-header h2 {{ margin: 0; font-size: 1.5em; }}
@@ -24,8 +28,16 @@ INDEX_TEMPLATE = """
     .report-summary {{ padding: 1.5em; }}
     .report-summary ul {{ margin: 0; padding-left: 1.2em; }}
     .report-summary li {{ margin-bottom: 0.5em; }}
-</style></head>
-<body><div class="container"><h1>Scraper Reports Index</h1>{report_list_html}</div></body></html>
+</style></head><body>
+<div class="container">
+    <h1>📊 Scraper Reports Index</h1>
+    <div class="summary-stats">
+        <h2>Migration Progress</h2>
+        <div class="progress-bar"><div class="progress-bar-inner" style="width: {percentage_complete:.2f}%;">{percentage_complete:.2f}%</div></div>
+        <p class="stats-label">Completed: <strong>{total_markdown_species}</strong> of <strong>{total_php_species}</strong> species files.</p>
+    </div>
+    {report_list_html}
+</div></body></html>
 """
 
 HTML_TEMPLATE = """
@@ -79,6 +91,11 @@ def generate_html_report(report_title: str, summary_items: dict, sections: list,
 def update_index_page():
     # ... (This function remains exactly the same) ...
     print("Updating reports index page...")
+    master_urls = get_master_php_urls()
+    existing_species = index_entries_by_url(MARKDOWN_DIR)
+    total_php_species = len(master_urls)
+    total_markdown_species = len(existing_species)
+    percentage_complete = (total_markdown_species / total_php_species * 100) if total_php_species > 0 else 0
     reports = []
     if not REPORT_DIR.is_dir():
         return
@@ -135,7 +152,12 @@ def update_index_page():
             </div>
             """
     
-    index_content = INDEX_TEMPLATE.format(report_list_html=report_list_html)
+    index_content = INDEX_TEMPLATE.format(
+        report_list_html=report_list_html,
+        total_php_species=total_php_species,
+        total_markdown_species=total_markdown_species,
+        percentage_complete=percentage_complete
+    )
     index_path = REPORT_DIR / "index.html"
     with open(index_path, 'w', encoding='utf-8') as f:
         f.write(index_content)

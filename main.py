@@ -6,6 +6,7 @@ import sys
 from tasks.scrape_new import run_scrape_new
 from tasks.cleanup import run_cleanup
 from tasks.audit import run_audit
+from tasks.generate_redirects import run_generate_redirects
 
 def main():
     """
@@ -26,7 +27,18 @@ def main():
         action='store_true',
         help="Run in 'live mode' to create new files. Default is a 'dry run' report."
     )
+    scrape_parser.add_argument(
+        '--interactive',
+        action='store_true',
+        help="Launch the interactive selector finder for books with missing or failing rules."
+    )
     scrape_parser.set_defaults(handler=run_scrape_new)
+
+    redirects_parser = subparsers.add_parser(
+        "redirects",
+        help="Generate a redirects.csv map from legacy URLs to new paths."
+    )
+    redirects_parser.set_defaults(handler=run_generate_redirects)
 
     # --- Parser for the "cleanup" command ---
     cleanup_parser = subparsers.add_parser(
@@ -59,7 +71,7 @@ def main():
     # Call the handler function associated with the chosen command
     if hasattr(args, 'handler'):
         if args.command == 'scrape':
-            args.handler(generate_files=args.generate_files)
+            args.handler(generate_files=args.generate_files, interactive=args.interactive)
         elif args.command == 'cleanup':
             args.handler(
                 images=args.images,
@@ -67,7 +79,7 @@ def main():
                 fields=args.fields,
                 citations=args.citations
             )
-        elif args.command == 'audit':
+        elif args.command in ['audit', 'redirects']:
             args.handler() # Audit command doesn't need arguments
     else:
         parser.print_help()

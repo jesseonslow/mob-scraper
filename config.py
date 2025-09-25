@@ -48,17 +48,23 @@ GROUP_MAPPING = {
     "throana/": "throana",
 }
 
-# --- SCRAPING & PARSING CONFIGURATION ---
-# Selectors and rules for the web scraper to extract the correct content from the PHP files.
-
-# CSS selectors to find the main content block in the HTML for each book.
-BOOK_CONTENT_SELECTORS = {
-    'three': 'p[align="justify"]',
-    'four': 'p[align="justify"]',
-    'five': 'p[align="justify"], p[class="MsoNormal"][style*="text-align:justify"], p[class="MsoNormal"][align="justify"]',
-    'seven': 'p[id="content"]',
-    'eight': 'p[align="justify"], p[style*="text-align:justify"]',
-    'nine': 'p[style*="text-align:justify"]'
+# --- BOOK-SPECIFIC SCRAPING RULES ---
+# This is the new, flexible rule-based system for the scraper.
+# Each book can have its own set of CSS selectors and extraction methods.
+BOOK_SCRAPING_RULES = {
+    'default': {
+        'content_container_selector': 'p[align="justify"]',
+        'name_selector': 'b',
+    },
+    'eleven': {
+        'content_container_selector': 'p[align="justify"]',
+        'content_extraction_method': 'last_span_text', # Custom method flag
+        'name_selector': 'b',
+        'genus_selector': 'b i', # Genus is in an <i> tag inside the <b> tag
+        'citation_selector': 'p[align="justify"] > span',
+        'citation_extraction_method': 'first_span_text' # Custom method flag
+    }
+    # You can add rules for 'three', 'four', etc. here as needed.
 }
 
 # --- DATA CLEANUP RULES ---
