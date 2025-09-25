@@ -1,11 +1,8 @@
-# mob-scraper/tasks/scrape_new.py
-
 import re
 import frontmatter
 from pathlib import Path
 from bs4 import BeautifulSoup
 
-# Import from our new modular project structure
 from config import (
     PHP_ROOT_DIR, MARKDOWN_DIR, GENERA_DIR, LEGACY_URL_BASE,
     BOOK_WORD_MAP, BOOK_CONTENT_SELECTORS
@@ -16,12 +13,16 @@ from file_system import (
 )
 from scraper import SpeciesScraper
 from processing import format_body_content
+# Import the new shared function
+from tasks.utils import get_contextual_data
+
 # from reporting import generate_audit_report # This would be the final reporting import
 
 def _get_contextual_data(missing_url, existing_species, existing_genera_by_url, existing_genera_by_slug):
     """
-    Finds a neighboring or parent entry to provide context (like genus, family) for a missing species.
-    This is a critical helper function adapted from your 'missing_entries.py' script.
+    Finds a neighboring or parent entry to provide context for a missing species.
+    This version includes improved logic for handling ..._XX_1.php genus URLs.
+   
     """
     url_pattern = re.compile(r'(.+)_(\d+)_(\d+)\.php$')
     match = url_pattern.search(missing_url)
@@ -29,27 +30,35 @@ def _get_contextual_data(missing_url, existing_species, existing_genera_by_url, 
         return None, None
     base, major, minor = match.groups()
 
-    # 1. Try to find a direct species neighbor (e.g., the entry for species '..._3_4.php' might be next to '..._3_5.php')
+    # --- NEW LOGIC FLOW ---
+
+    # 1. Self-Referential Check: Handle cases where the species URL is also a genus URL.
+    if missing_url in existing_genera_by_url:
+        return existing_genera_by_url[missing_url], 'self-referential genus'
+
+    # 2. Species Neighbor Check: Look for a preceding species file (e.g., ..._5_3.php for ..._5_4.php)
     neighbor_minor = int(minor) - 1
     if neighbor_minor > 0:
         neighbor_url = f"{base}_{major}_{neighbor_minor}.php"
-        neighbor_data = existing_species.get(neighbor_url)
-        if neighbor_data:
-            return neighbor_data, 'species'
+        if neighbor_url in existing_species:
+             return existing_species[neighbor_url], 'species neighbor'
 
-    # 2. Fallback to finding the parent genus by its URL
-    genus_url = f"{base}_{major}.php"
-    genus_data = existing_genera_by_url.get(genus_url)
-    if genus_data:
-        return genus_data, 'genus by URL'
+    # 3. Unusual Genus URL Check: Look for a genus at ..._XX_1.php
+    genus_url_format1 = f"{base}_{major}_1.php"
+    if genus_url_format1 in existing_genera_by_url:
+        return existing_genera_by_url[genus_url_format1], 'genus by unusual URL'
 
-    # 3. Special fallback for Book 4, which uses the directory name as the genus slug
+    # 4. Standard Genus URL Check: Look for a genus at ..._XX.php
+    genus_url_format2 = f"{base}_{major}.php"
+    if genus_url_format2 in existing_genera_by_url:
+        return existing_genera_by_url[genus_url_format2], 'genus by standard URL'
+
+    # 5. Book 4 Fallback: Look for genus by subdirectory slug
     if '/part-4/' in missing_url:
         try:
             genus_slug = missing_url.split('/part-4/', 1)[1].split('/')[0]
-            genus_data = existing_genera_by_slug.get(genus_slug)
-            if genus_data:
-                return genus_data, 'genus by slug'
+            if genus_slug in existing_genera_by_slug:
+                return existing_genera_by_slug[genus_slug], 'genus by slug'
         except IndexError:
             pass
     
@@ -154,10 +163,10 @@ def run_scrape_new(generate_files=False):
     print(f"\nFound {len(missing_urls)} missing entries. Analyzing for context...")
     
     creatable_entries = []
-    warnings = [] # For entries where we couldn't find a neighbor
-
+    warnings = [] 
     for url in missing_urls:
-        context_data, context_type = _get_contextual_data(url, existing_species, existing_genera_by_url, existing_genera_by_slug)
+        # Call the imported function
+        context_data, context_type = get_contextual_data(url, existing_species, existing_genera_by_url, existing_genera_by_slug)
         if context_data:
             creatable_entries.append({'url': url, 'neighbor_data': context_data, 'context_type': context_type})
         else:
