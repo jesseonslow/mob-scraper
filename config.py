@@ -127,7 +127,8 @@ KNOWN_TAXONOMIC_STATUSES = [
     'comb. n.',
     'sp. rev.',
     'sp. n.',
-    'ssp.'
+    'ssp.',
+    'sp.'
 ]
 
 # --- DATA CLEANUP RULES ---

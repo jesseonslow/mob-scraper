@@ -6,6 +6,7 @@ from pathlib import Path
 from urllib.request import urlopen
 from bs4 import BeautifulSoup
 from reclassification_manager import add_reclassified_url
+from parser import parse_html_with_rules
 
 # --- Configuration ---
 CONFIG_PATH = Path("./config.py")
@@ -39,10 +40,10 @@ def suggest_selectors(soup):
             
     return suggestions
 
-def get_user_choice(data_type, suggestions, soup, ask_method=True):
+def get_user_choice(data_type, suggestions, soup):
     """
     Displays suggestions and gets the user's choice for a rule (selector + index) AND a method.
-    Skips the method prompt if ask_method is False.
+    Skips the method prompt for the 'content' field.
     """
     print(f"\n--- Finding Rule for: {data_type.upper()} ---")
     
@@ -66,9 +67,9 @@ def get_user_choice(data_type, suggestions, soup, ask_method=True):
         except (ValueError, IndexError):
             if not chosen_rule: print("Invalid choice, please try again.")
 
-    # --- Step 2: Choose the Method (Now conditional) ---
+    # --- Step 2: Choose the Method (Conditional) ---
     
-    # For body content or if ask_method is False, we always want the full text.
+    # For body content, we always want the full text.
     if data_type == 'content':
         print(f"  -> Method for 'content' is always 'full_text'.")
         return chosen_rule, 'full_text'
@@ -171,8 +172,7 @@ def update_config_file(book_name, confirmed_rules):
 
 def run_interactive_selector_finder(book_name, sample_url, existing_rules=None):
     """
-    The core logic of the selector finder.
-    If existing_rules are provided, it enters 'verification mode'.
+    The core logic of the selector finder, now using the unified parser for verification.
     """
     print(f"\n--- Launching Interactive Selector Finder for book: '{book_name}' ---")
     
@@ -199,43 +199,44 @@ def run_interactive_selector_finder(book_name, sample_url, existing_rules=None):
 
     suggestions = suggest_selectors(soup)
     confirmed_rules = existing_rules.copy() if existing_rules else {}
-    fields_to_find = ['name', 'citation', 'content'] # 'genus' is handled by the name parser
+    fields_to_find = ['name', 'genus', 'citation', 'content']
     
     for field in fields_to_find:
         field_key = f"{field}_selector"
+
+        if existing_rules and failed_fields is not None and field not in failed_fields:
+            print(f"--- Verifying Rule for: {field.upper()} ---")
+            print("  -> Rule assumed to be correct. Skipping.")
+            continue
         
         if existing_rules and field_key in existing_rules:
-            # --- Verification Mode ---
             print(f"\n--- Verifying Rule for: {field.upper()} ---")
-            rule = existing_rules[field_key]
             
-            from scrapers.text_scraper import _get_text_from_rule, _apply_method, scrape_body_content
+            parsed_data = parse_html_with_rules(soup, existing_rules, "N/A")
+            extracted_text = parsed_data.get(field)
             
-            # (Logic to test and display the rule's output is correct)
-            # ...
+            print(f"Current Rule: {existing_rules.get(field_key)}")
+            if isinstance(extracted_text, list): extracted_text = " ".join(extracted_text)
+            print(f"Extracted Text: \"{extracted_text[:200]}\"")
             
             while True:
-                choice = input("Is this correct? [Y/n/s] (Yes/No/Skip Field): ").lower()
+                choice = input("Is this correct? [Y/n/s]: ").lower()
                 if choice in ('y', ''):
-                    confirmed_rules[field_key] = rule
+                    confirmed_rules[field_key] = existing_rules[field_key]
                     break
                 elif choice == 'n':
-                    # Drop into the full finder for this field
                     new_rule, new_method = get_user_choice(field, suggestions.get(field, []), soup)
                     if new_rule:
                         confirmed_rules[field_key] = {'selector': new_rule['selector'], 'index': new_rule['index']}
                         if new_method: confirmed_rules[field_key]['method'] = new_method
                     break
                 elif choice == 's':
-                    # --- FIX: Ensure skipping removes the old, broken rule ---
-                    if field_key in confirmed_rules:
-                        del confirmed_rules[field_key]
-                    print(f"  -> Rule for '{field}' will be removed for this book.")
+                    if field_key in confirmed_rules: del confirmed_rules[field_key]
+                    print(f"  -> Rule for '{field}' will be removed.")
                     break
                 else:
                     print("Invalid choice.")
         else:
-            # --- New Rule Mode (Unchanged) ---
             rule, method = get_user_choice(field, suggestions.get(field, []), soup)
             if rule:
                 confirmed_rules[field_key] = {'selector': rule['selector'], 'index': rule['index']}
