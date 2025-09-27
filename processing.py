@@ -1,5 +1,3 @@
-# mob-scraper/processing.py
-
 import re
 import yaml
 import frontmatter
@@ -10,14 +8,7 @@ def format_body_content(markdown_text: str):
 
     This function takes a string of messy markdown and applies a series of regex rules
     to reflow the text, correctly identify and format headings, and fix common spacing
-    and punctuation issues. It is adapted from the robust implementation in your
-    'missing_entries.py' script.
-
-    Args:
-        markdown_text: The raw markdown string to be cleaned.
-
-    Returns:
-        A cleaned, well-formatted markdown string.
+    and punctuation issues.
     """
     if not markdown_text:
         return ""

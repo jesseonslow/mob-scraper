@@ -76,6 +76,68 @@ def index_entries_by_slug(directory: Path):
     print(f"Indexed {len(slug_map)} entries by slug.")
     return slug_map
 
+def update_config_file(book_name, confirmed_rules):
+    """
+    Safely reads, updates, and writes back the configuration file with the new rule structure.
+    """
+    print(f"\nUpdating '{CONFIG_PATH}' with new rules for book '{book_name}'...")
+
+    with open(CONFIG_PATH, 'r', encoding='utf-8') as f:
+        lines = f.readlines()
+
+    try:
+        start_index = -1
+        end_index = -1
+        brace_count = 0
+        in_dict = False
+
+        for i, line in enumerate(lines):
+            if line.strip().startswith(f"{RULES_VAR_NAME} = {{"):
+                start_index = i
+                in_dict = True
+            
+            if in_dict:
+                brace_count += line.count('{')
+                brace_count -= line.count('}')
+                if brace_count == 0:
+                    end_index = i
+                    break
+        
+        if start_index == -1 or end_index == -1:
+            print("Error: Could not find the BOOK_SCRAPING_RULES dictionary in config.py.")
+            return
+
+        new_rule_lines = [f"    '{book_name}': {{\n"]
+        for key, value in confirmed_rules.items():
+            selector = value['selector']
+            index = value['index']
+            method = value['method']
+            new_rule_lines.append(f"        '{key}': {{'selector': '{selector}', 'index': {index}, 'method': '{method}'}},\n")
+        new_rule_lines.append("    },\n")
+
+        new_lines = lines[:start_index + 1]
+        new_lines.extend(new_rule_lines)
+        
+        in_old_book_entry = False
+        for line in lines[start_index + 1 : end_index]:
+            if f"'{book_name}':" in line:
+                in_old_book_entry = True
+            if '}' in line and in_old_book_entry:
+                in_old_book_entry = False
+                continue
+            if not in_old_book_entry:
+                new_lines.append(line)
+        new_lines.append(lines[end_index])
+        new_lines.extend(lines[end_index + 1:])
+
+        with open(CONFIG_PATH, 'w', encoding='utf-8') as f:
+            f.writelines(new_lines)
+        
+        print("✅ Config file updated successfully!")
+
+    except Exception as e:
+        print(f"❌ Failed to update config file: {e}")
+
 def save_markdown_file(post: frontmatter.Post, filepath: Path):
     """
     Safely saves a frontmatter.Post object to a file.
