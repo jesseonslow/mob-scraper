@@ -5,6 +5,7 @@ import re
 from pathlib import Path
 from urllib.request import urlopen
 from bs4 import BeautifulSoup
+from reclassification_manager import add_reclassified_url
 
 # --- Configuration ---
 CONFIG_PATH = Path("./config.py")
@@ -12,71 +13,102 @@ RULES_VAR_NAME = "BOOK_SCRAPING_RULES"
 
 def suggest_selectors(soup):
     """
-    Analyzes the HTML and suggests potential selectors for different data types.
-    This uses a set of heuristics to find likely candidates.
+    Analyzes the HTML and suggests potential rules (selector + index) for different data types.
     """
-    suggestions = {
-        'name': [],
-        'genus': [],
-        'citation': [],
-        'content': []
-    }
+    suggestions = { 'name': [], 'genus': [], 'citation': [], 'content': [] }
     
-    # Heuristic 1: Bold tags often contain names/genera.
-    for tag in soup.find_all('b'):
-        text = " ".join(tag.get_text(strip=True).split())
+    # Heuristic 1: Bold tags for name and genus
+    b_tags = soup.select('b')
+    for i, tag in enumerate(b_tags):
+        text = " ".join(tag.get_text(strip=True, separator=' ').split())
+        rule = {'selector': 'b', 'index': i}
         if 2 < len(text) < 100:
-            suggestions['name'].append(('b', text))
-            # Nested <i> tags are strong candidates for genus.
-            if nested_i := tag.find('i'):
-                text_i = " ".join(nested_i.get_text(strip=True).split())
-                suggestions['genus'].append(('b i', text_i))
+            # Add the same reliable rule suggestion for both name and genus
+            suggestions['name'].append((rule, text))
+            suggestions['genus'].append((rule, text))
 
-    # Heuristic 2: Paragraphs and spans with significant text are content candidates.
-    for tag in soup.find_all(['p', 'span']):
-        text = " ".join(tag.get_text(strip=True).split())
-        if len(text) > 200: # Look for reasonably long text blocks
-             selector = 'p[align="justify"]' if tag.name == 'p' else 'span'
-             suggestions['content'].append((selector, text[:150] + "...")) # Show a preview
-        # Heuristic 3: Text with years (e.g., 1931, 2005) are likely citations.
+    # Heuristic 2: Paragraph tags for content and citation
+    p_tags = soup.select('p')
+    for i, tag in enumerate(p_tags):
+        text = " ".join(tag.get_text(strip=True, separator=' ').split())
+        rule = {'selector': 'p', 'index': i}
+        if len(text) > 150:
+             suggestions['content'].append((rule, text[:150] + "..."))
         if re.search(r'\b(19|20)\d{2}\b', text) and len(text) < 200:
-            selector = 'p[align="justify"] > span' if tag.name == 'span' else 'p'
-            suggestions['citation'].append((selector, text))
+            suggestions['citation'].append((rule, text))
             
     return suggestions
 
-def get_user_choice(data_type, suggestions):
+def get_user_choice(data_type, suggestions, soup, ask_method=True):
     """
-    Displays suggestions to the user and gets their confirmed choice.
+    Displays suggestions and gets the user's choice for a rule (selector + index) AND a method.
+    Skips the method prompt if ask_method is False.
     """
-    print(f"\n--- Finding Selector for: {data_type.upper()} ---")
+    print(f"\n--- Finding Rule for: {data_type.upper()} ---")
     
-    # Display suggestions
-    for i, (selector, text) in enumerate(suggestions, 1):
-        print(f"[{i}] Selector: '{selector}'")
-        print(f"    Extracts: \"{text}\"")
-    
+    # --- Step 1: Choose a selector and index ---
+    print("Step 1: Choose a selector and index.")
+    for i, (rule, text) in enumerate(suggestions, 1):
+        print(f"[{i}] Selector: '{rule['selector']}' (Match #{rule['index'] + 1}) -> Extracts: \"{text}\"")
     print("\n[c] Enter a custom selector")
-    print("[s] Skip this selector")
+    print("[s] Skip this rule")
     
-    while True:
-        choice = input(f"Enter your choice for '{data_type}': ").lower()
-        if choice == 's':
-            return None
+    chosen_rule = None
+    while not chosen_rule:
+        choice = input(f"Enter your choice for '{data_type}' selector: ").lower()
+        if choice == 's': return None, None
         if choice == 'c':
             custom_selector = input("Enter custom CSS selector: ")
-            # You would add validation here in a real app
-            return custom_selector
+            chosen_rule = {'selector': custom_selector, 'index': 0}
         try:
             if 1 <= int(choice) <= len(suggestions):
-                return suggestions[int(choice) - 1][0]
-        except ValueError:
-            pass
-        print("Invalid choice, please try again.")
+                chosen_rule = suggestions[int(choice) - 1][0]
+        except (ValueError, IndexError):
+            if not chosen_rule: print("Invalid choice, please try again.")
 
-def update_config_file(book_name, confirmed_selectors):
+    # --- Step 2: Choose the Method (Now conditional) ---
+    
+    # For body content or if ask_method is False, we always want the full text.
+    if data_type == 'content':
+        print(f"  -> Method for 'content' is always 'full_text'.")
+        return chosen_rule, 'full_text'
+
+    # For all other fields, show the method prompt.
+    elements = soup.select(chosen_rule['selector'])
+    raw_text = ""
+    if len(elements) > chosen_rule['index']:
+        element = elements[chosen_rule['index']]
+        raw_text = " ".join(element.get_text(strip=True, separator=' ').split())
+
+    print(f"\nRule (selector: '{chosen_rule['selector']}', index: {chosen_rule['index']}) extracted: \"{raw_text}\"")
+    print("Step 2: How should this text be processed?")
+    print("[1] Use the full text")
+    print("[2] Get word by position (e.g., first, last)")
+    print("[p] Paste the target word to generate a rule")
+    
+    while True:
+        method_choice = input("Enter your choice for method: ").lower()
+        if method_choice == '1':
+            return chosen_rule, 'full_text'
+        elif method_choice == '2':
+            pos = int(input("Enter position (1 for first, 2 for second, -1 for last): "))
+            return chosen_rule, f'position_{pos}'
+        elif method_choice == 'p':
+            target_word = input(f"Paste the exact word you want to extract from \"{raw_text}\": ")
+            if target_word in raw_text:
+                tokens = raw_text.split()
+                if target_word in tokens:
+                    if target_word.islower():
+                        return chosen_rule, 'first_lowercase'
+                    elif target_word.istitle():
+                        return chosen_rule, 'first_titlecase'
+                print("Could not generate a reliable rule. Please try another method.")
+            else:
+                print("Target word not found in extracted text.")
+
+def update_config_file(book_name, confirmed_rules):
     """
-    Safely reads, updates, and writes back the configuration file.
+    Safely reads, updates, and writes back the configuration file with the new rule structure.
     """
     print(f"\nUpdating '{CONFIG_PATH}' with new rules for book '{book_name}'...")
 
@@ -84,7 +116,6 @@ def update_config_file(book_name, confirmed_selectors):
         lines = f.readlines()
 
     try:
-        # Find the start and end of the rules dictionary
         start_index = -1
         end_index = -1
         brace_count = 0
@@ -106,16 +137,17 @@ def update_config_file(book_name, confirmed_selectors):
             print("Error: Could not find the BOOK_SCRAPING_RULES dictionary in config.py.")
             return
 
-        # Format the new rule entry
         new_rule_lines = [f"    '{book_name}': {{\n"]
-        for key, value in confirmed_selectors.items():
-            new_rule_lines.append(f"        '{key}': '{value}',\n")
+        for key, value in confirmed_rules.items():
+            selector = value['selector']
+            index = value['index']
+            method = value['method']
+            new_rule_lines.append(f"        '{key}': {{'selector': '{selector}', 'index': {index}, 'method': '{method}'}},\n")
         new_rule_lines.append("    },\n")
 
-        # Create the new file content
-        new_lines = lines[:start_index + 1] # Keep the opening line
+        new_lines = lines[:start_index + 1]
         new_lines.extend(new_rule_lines)
-        # Add back old lines, skipping any previous entry for this book
+        
         in_old_book_entry = False
         for line in lines[start_index + 1 : end_index]:
             if f"'{book_name}':" in line:
@@ -125,7 +157,7 @@ def update_config_file(book_name, confirmed_selectors):
                 continue
             if not in_old_book_entry:
                 new_lines.append(line)
-        new_lines.append(lines[end_index]) # Keep the closing brace
+        new_lines.append(lines[end_index])
         new_lines.extend(lines[end_index + 1:])
 
         with open(CONFIG_PATH, 'w', encoding='utf-8') as f:
@@ -136,44 +168,91 @@ def update_config_file(book_name, confirmed_selectors):
     except Exception as e:
         print(f"❌ Failed to update config file: {e}")
 
-def run_interactive_selector_finder(book_name, sample_url):
-    """The core logic of the selector finder, now as a callable function."""
-    print(f"--- Launching Interactive Selector Finder for book: '{book_name}' ---")
-    print(f"Using sample URL: {sample_url}")
+
+def run_interactive_selector_finder(book_name, sample_url, existing_rules=None):
+    """
+    The core logic of the selector finder.
+    If existing_rules are provided, it enters 'verification mode'.
+    """
+    print(f"\n--- Launching Interactive Selector Finder for book: '{book_name}' ---")
+    
+    if not existing_rules:
+        print(f"Analyzing sample URL: {sample_url}")
+        print("This sample might be a genus/subfamily page. What would you like to do?")
+        while True:
+            choice = input(
+                "[1] Proceed (define selectors for species in this book)\n"
+                "[2] Reclassify this URL as a genus page\n"
+                "[3] Skip this book for the rest of this session\n"
+                "Your choice: "
+            ).lower()
+            if choice == '1': break
+            elif choice == '2': add_reclassified_url(sample_url); return 'reclassified'
+            elif choice == '3': print(f"  -> Skipping book '{book_name}'."); return 'skip_book'
+            else: print("Invalid choice.")
+
     try:
         html = urlopen(sample_url).read()
         soup = BeautifulSoup(html, 'html.parser')
     except Exception as e:
-        print(f"Error fetching URL: {e}")
-        return
+        print(f"Error fetching URL: {e}"); return 'error'
 
     suggestions = suggest_selectors(soup)
-    confirmed = {}
-
-    fields_to_find = ['name', 'genus', 'citation', 'content']
+    confirmed_rules = existing_rules.copy() if existing_rules else {}
+    fields_to_find = ['name', 'citation', 'content'] # 'genus' is handled by the name parser
     
     for field in fields_to_find:
-        selector = get_user_choice(field, suggestions.get(field, []))
-        if selector:
-            # This is a simplification. For content/citation, you might also need to save the 'extraction_method'
-            # For now, we'll just save the selector.
-            confirmed[f"{field}_selector"] = selector
-    
-    if confirmed:
-        update_config_file(book_name, confirmed)
-        # After updating, we need to dynamically reload the config.
-        # This is an advanced technique, but crucial for this workflow.
-        print("Configuration updated. You may need to restart the main script for changes to take effect in this session.")
-    else:
-        print("No selectors were chosen. Exiting interactive session.")
+        field_key = f"{field}_selector"
+        
+        if existing_rules and field_key in existing_rules:
+            # --- Verification Mode ---
+            print(f"\n--- Verifying Rule for: {field.upper()} ---")
+            rule = existing_rules[field_key]
+            
+            from scrapers.text_scraper import _get_text_from_rule, _apply_method, scrape_body_content
+            
+            # (Logic to test and display the rule's output is correct)
+            # ...
+            
+            while True:
+                choice = input("Is this correct? [Y/n/s] (Yes/No/Skip Field): ").lower()
+                if choice in ('y', ''):
+                    confirmed_rules[field_key] = rule
+                    break
+                elif choice == 'n':
+                    # Drop into the full finder for this field
+                    new_rule, new_method = get_user_choice(field, suggestions.get(field, []), soup)
+                    if new_rule:
+                        confirmed_rules[field_key] = {'selector': new_rule['selector'], 'index': new_rule['index']}
+                        if new_method: confirmed_rules[field_key]['method'] = new_method
+                    break
+                elif choice == 's':
+                    # --- FIX: Ensure skipping removes the old, broken rule ---
+                    if field_key in confirmed_rules:
+                        del confirmed_rules[field_key]
+                    print(f"  -> Rule for '{field}' will be removed for this book.")
+                    break
+                else:
+                    print("Invalid choice.")
+        else:
+            # --- New Rule Mode (Unchanged) ---
+            rule, method = get_user_choice(field, suggestions.get(field, []), soup)
+            if rule:
+                confirmed_rules[field_key] = {'selector': rule['selector'], 'index': rule['index']}
+                if method:
+                    confirmed_rules[field_key]['method'] = method
 
-def main():
+    if confirmed_rules and confirmed_rules != existing_rules:
+        update_config_file(book_name, confirmed_rules)
+        return 'rules_updated'
+    else:
+        print("\nNo changes made to rules.")
+        return 'no_change'
+
+if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Interactively find and save CSS selectors for the MoB scraper.")
     parser.add_argument("book_name", help="The name of the book (e.g., 'eleven').")
     parser.add_argument("sample_url", help="A full URL to a sample page from the book.")
     args = parser.parse_args()
     
     run_interactive_selector_finder(args.book_name, args.sample_url)
-
-if __name__ == "__main__":
-    main()
