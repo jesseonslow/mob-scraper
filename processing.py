@@ -97,3 +97,18 @@ def clean_citation_frontmatter(fm_string: str):
     if num_replacements > 0:
         return new_fm_string
     return fm_string # Return original if no changes were made
+
+def correct_text_spacing(text: str) -> str:
+    """
+    Applies a series of corrections to text extracted from HTML to fix
+    common spacing issues caused by BeautifulSoup's get_text().
+    """
+    if not text:
+        return ""
+    
+    # Corrects spacing for names like '?sakuraii' where an unwanted
+    # space is inserted after the question mark.
+    if '? ' in text:
+        text = text.replace('? ', '?')
+    
+    return text

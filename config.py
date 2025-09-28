@@ -9,6 +9,7 @@ MARKDOWN_DIR = Path("../moths-of-borneo/src/content/species/")
 GENERA_DIR = Path("../moths-of-borneo/src/content/genera/")
 PHP_ROOT_DIR = Path("../MoB-PHP/")
 REPORT_DIR = Path("./html/")
+CONFIG_PATH = Path(__file__)
 
 # --- REPORTING ---
 # Centralized filenames for any generated reports.
@@ -52,79 +53,58 @@ GROUP_MAPPING = {
 # --- BOOK-SPECIFIC SCRAPING RULES ---
 # This is the new, flexible rule-based system for the scraper.
 # Each book can have its own set of CSS selectors and extraction methods.
-BOOK_SCRAPING_RULES = {
-    'nine': {
-        'name_selector': {'selector': 'b', 'index': 2, 'method': 'position_2'},
-        'content_selector': {'selector': 'p', 'index': 4, 'method': 'full_text'},
-    },
-    'seven': {
-        'name_selector': {'selector': 'b', 'index': 1, 'method': 'position_2'},
-        'content_selector': {'selector': 'p', 'index': 5, 'method': 'full_text'},
-    },
-    'five': {
-        'name_selector': {'selector': 'b', 'index': 3, 'method': 'full_text'},
-        'citation_selector': {'selector': 'p', 'index': 3, 'method': 'full_text'},
-        'content_selector': {'selector': 'p', 'index': 4, 'method': 'full_text'},
-    },
-    'four': {
-        'name_selector': {'selector': 'b', 'index': 2, 'method': 'position_2'},
-        'content_selector': {'selector': 'p', 'index': 6, 'method': 'full_text'},
-    },
-    'three': {
-        'name_selector': {'selector': 'b', 'index': 2, 'method': 'position_2'},
-        'content_selector': {'selector': 'p', 'index': 5, 'method': 'full_text'},
-    },
-    'eighteen': {
-        'name_selector': {'selector': 'b', 'index': 3, 'method': 'position_1'},
-        'citation_selector': {'selector': 'p', 'index': 3, 'method': 'full_text'},
-        'content_selector': {'selector': 'p', 'index': 5, 'method': 'full_text'},
-    },
-    'seventeen': {
-        'name_selector': {'selector': 'b', 'index': 2, 'method': 'first_lowercase'},
-        'content_selector': {'selector': 'p', 'index': 3, 'method': 'full_text'},
-    },
-    'fifteen': {
-        'name_selector': {'selector': 'b', 'index': 2, 'method': 'first_lowercase'},
-        'citation_selector': {'selector': 'p', 'index': 3, 'method': 'full_text'},
-        'content_selector': {'selector': 'p', 'index': 6, 'method': 'full_text'},
-    },
-    'fourteen': {
-        'name_selector': {'selector': 'b', 'index': 3, 'method': 'first_lowercase'},
-        'citation_selector': {'selector': 'p', 'index': 3, 'method': 'full_text'},
-        'content_selector': {'selector': 'p', 'index': 4, 'method': 'full_text'},
-    },
-    'thirteen': {
-        'name_selector': {'selector': 'b', 'index': 2, 'method': 'first_lowercase'},
-    },
-    'ten': {
-        'name_selector': {'selector': 'b', 'index': 2, 'method': 'first_lowercase'},
-        'content_selector': {'selector': 'p', 'index': 4, 'method': 'full_text'},
-    },
-    'eight': {
-        'name_selector': {'selector': 'b', 'method': 'last_word'},
-        'genus_selector': {'selector': 'b i', 'method': 'first_word'},
-        'content_selector': {'selector': 'p[align="justify"]', 'method': 'full_text'},
-    },
-    'default': {
-        'content_container_selector': 'p[align="justify"]',
-        'name_selector': 'b',
-    },
-    'eleven': {
-        'content_container_selector': 'p[align="justify"]',
-        'content_extraction_method': 'last_span_text', # Custom method flag
-        'name_selector': 'b',
-        'genus_selector': 'b i', # Genus is in an <i> tag inside the <b> tag
-        'citation_selector': 'p[align="justify"] > span',
-        'citation_extraction_method': 'first_span_text' # Custom method flag
-    }
-    # You can add rules for 'three', 'four', etc. here as needed.
-}
+RULES_VAR_NAME = "BOOK_SCRAPING_RULES"
+BOOK_SCRAPING_RULES = {   'default': {   'content_container_selector': 'p[align="justify"]',
+                   'name_selector': {'index': 2, 'method': 'first_lowercase', 'selector': 'b'}},
+    'eight': {   'content_selector': {'index': -1, 'method': 'full_text', 'selector': 'p[style*="text-align:justify"]'},
+                 'genus_selector': {'method': 'first_word', 'selector': 'b i'},
+                 'name_selector': {'method': 'last_word', 'selector': 'b'}},
+    'eighteen': {   'citation_selector': {'index': 3, 'method': 'full_text', 'selector': 'p'},
+                    'content_selector': {'index': 5, 'method': 'full_text', 'selector': 'p'},
+                    'genus_selector': {'index': 2, 'method': 'position_1', 'selector': 'b'},
+                    'name_selector': {'index': 3, 'method': 'position_1', 'selector': 'b'}},
+    'eleven': {   'content_selector': {'index': 4, 'method': 'full_text', 'selector': 'p'},
+                  'genus_selector': {'index': 2, 'method': 'position_1', 'selector': 'b'},
+                  'name_selector': {'index': 2, 'method': 'position_2', 'selector': 'b'}},
+    'fifteen': {   'citation_selector': {'index': 3, 'method': 'full_text', 'selector': 'p'},
+                   'content_selector': {'index': 6, 'method': 'full_text', 'selector': 'p'},
+                   'genus_selector': {'index': 2, 'method': 'position_1', 'selector': 'b'},
+                   'name_selector': {'index': 2, 'method': 'position_2', 'selector': 'b'}},
+    'five': {   'citation_selector': {'index': 3, 'method': 'full_text', 'selector': 'p'},
+                'content_selector': {'index': 4, 'method': 'full_text', 'selector': 'p'},
+                'genus_selector': {'index': 2, 'method': 'position_1', 'selector': 'b'},
+                'name_selector': {'index': 2, 'method': 'position_2', 'selector': 'b'}},
+    'four': {   'content_selector': {'index': 6, 'method': 'full_text', 'selector': 'p'},
+                'name_selector': {'index': 2, 'method': 'position_2', 'selector': 'b'}},
+    'fourteen': {   'citation_selector': {'index': 3, 'method': 'full_text', 'selector': 'p'},
+                    'content_selector': {'index': 4, 'method': 'full_text', 'selector': 'p'},
+                    'genus_selector': {'index': 3, 'method': 'position_1', 'selector': 'b'},
+                    'name_selector': {'index': 3, 'method': 'position_2', 'selector': 'b'}},
+    'nine': {   'content_selector': {'index': 4, 'method': 'full_text', 'selector': 'p'},
+                'genus_selector': {'index': 2, 'method': 'position_1', 'selector': 'b'},
+                'name_selector': {'index': 2, 'method': 'position_2', 'selector': 'b'}},
+    'seven': {   'content_selector': {'index': 5, 'method': 'full_text', 'selector': 'p'},
+                 'genus_selector': {'index': 1, 'method': 'position_1', 'selector': 'b'},
+                 'name_selector': {'index': 1, 'method': 'position_2', 'selector': 'b'}},
+    'seventeen': {   'content_selector': {'index': 3, 'method': 'full_text', 'selector': 'p'},
+                     'name_selector': {'index': 2, 'method': 'first_lowercase', 'selector': 'b'}},
+    'ten': {   'content_selector': {'index': 4, 'method': 'full_text', 'selector': 'p'},
+               'genus_selector': {'index': 2, 'method': 'position_1', 'selector': 'b'},
+               'name_selector': {'index': 2, 'method': 'position_2', 'selector': 'b'}},
+    'thirteen': {   'content_selector': {'index': 4, 'method': 'full_text', 'selector': 'p'},
+                    'genus_selector': {'index': 2, 'method': 'position_1', 'selector': 'b'},
+                    'name_selector': {'index': 2, 'method': 'first_lowercase', 'selector': 'b'}},
+    'three': {   'content_selector': {'index': 5, 'method': 'full_text', 'selector': 'p'},
+                 'genus_selector': {'index': 2, 'method': 'position_1', 'selector': 'b'},
+                 'name_selector': {'index': 2, 'method': 'position_2', 'selector': 'b'}}}
 
 KNOWN_TAXONOMIC_STATUSES = [
     'stat. rev.',
     'stat. n.',
     'comb. rev.',
     'comb. n.',
+    'syns. n.',
+    'syn. n.',
     'sp. rev.',
     'sp. n.',
     'ssp.',

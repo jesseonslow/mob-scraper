@@ -2,23 +2,22 @@
 
 import frontmatter
 import re
+import ast
+import pprint
 from pathlib import Path
-from config import PHP_ROOT_DIR, LEGACY_URL_BASE
+from config import (
+    PHP_ROOT_DIR, LEGACY_URL_BASE, CONFIG_PATH, RULES_VAR_NAME
+)
 
 def get_master_php_urls():
     """
     Crawls the MoB-PHP directory to build a master list of all valid species URLs.
-    
-    This function is crucial for discovering which species exist on the legacy site,
-    forming the basis for audit and scraping tasks.
     """
     master_urls = set()
-    # This pattern specifically targets species pages (e.g., 'genus_1_2.php') and ignores genus pages (e.g., 'genus_1.php')
     url_pattern = re.compile(r'([a-zA-Z0-9_-]+)_(\d+)_(\d+)\.php$')
     
     print(f"Scanning for PHP files in '{PHP_ROOT_DIR}'...")
     for php_path in PHP_ROOT_DIR.glob('part-*/**/*.php'):
-        # Skip any files within an 'images' directory
         if 'images' in [part.lower() for part in php_path.parts]:
             continue
         if not url_pattern.match(php_path.name):
@@ -34,9 +33,6 @@ def get_master_php_urls():
 def index_entries_by_url(directory: Path):
     """
     Scans a markdown directory and returns a map of legacy_url to its frontmatter data.
-    
-    This creates a fast lookup index to check for the existence of a page based on its
-    original URL, preventing duplicate entries.
     """
     print(f"Building legacy_url index for '{directory.name}'...")
     url_map = {}
@@ -49,7 +45,6 @@ def index_entries_by_url(directory: Path):
             if post.metadata.get('legacy_url'):
                 url_map[post.metadata['legacy_url']] = post.metadata
         except Exception:
-            # Silently continue if a file is malformed, to avoid crashing the whole process.
             continue
     print(f"Indexed {len(url_map)} entries by legacy_url.")
     return url_map
@@ -57,9 +52,6 @@ def index_entries_by_url(directory: Path):
 def index_entries_by_slug(directory: Path):
     """
     Scans a markdown directory and returns a map of the file's slug to its frontmatter data.
-    
-    This is useful for finding parent genera, especially in cases where the legacy_url
-    is not consistently formatted (e.g., for Book 4).
     """
     print(f"Building slug index for '{directory.name}'...")
     slug_map = {}
@@ -69,7 +61,6 @@ def index_entries_by_slug(directory: Path):
         try:
             with open(md_path, 'r', encoding='utf-8-sig') as f:
                 post = frontmatter.load(f)
-            # The 'stem' is the filename without the extension (e.g., 'my-file.md' -> 'my-file')
             slug_map[md_path.stem] = post.metadata
         except Exception:
             continue
@@ -78,61 +69,54 @@ def index_entries_by_slug(directory: Path):
 
 def update_config_file(book_name, confirmed_rules):
     """
-    Safely reads, updates, and writes back the configuration file with the new rule structure.
+    Safely reads, updates, and writes back the configuration file using an Abstract Syntax Tree (AST).
+    This method is robust against formatting changes and guarantees syntactically correct output.
     """
     print(f"\nUpdating '{CONFIG_PATH}' with new rules for book '{book_name}'...")
-
-    with open(CONFIG_PATH, 'r', encoding='utf-8') as f:
-        lines = f.readlines()
-
     try:
-        start_index = -1
-        end_index = -1
-        brace_count = 0
-        in_dict = False
+        content = CONFIG_PATH.read_text(encoding='utf-8')
+        tree = ast.parse(content)
 
-        for i, line in enumerate(lines):
-            if line.strip().startswith(f"{RULES_VAR_NAME} = {{"):
-                start_index = i
-                in_dict = True
-            
-            if in_dict:
-                brace_count += line.count('{')
-                brace_count -= line.count('}')
-                if brace_count == 0:
-                    end_index = i
-                    break
+        # Find the assignment node for BOOK_SCRAPING_RULES
+        assignment_node = None
+        for node in ast.walk(tree):
+            if (isinstance(node, ast.Assign) and
+                    len(node.targets) == 1 and
+                    isinstance(node.targets[0], ast.Name) and
+                    node.targets[0].id == RULES_VAR_NAME):
+                assignment_node = node
+                break
         
-        if start_index == -1 or end_index == -1:
-            print("Error: Could not find the BOOK_SCRAPING_RULES dictionary in config.py.")
+        if not assignment_node or not isinstance(assignment_node.value, ast.Dict):
+            print(f"Error: Could not find the '{RULES_VAR_NAME}' dictionary in {CONFIG_PATH}.")
             return
 
-        new_rule_lines = [f"    '{book_name}': {{\n"]
-        for key, value in confirmed_rules.items():
-            selector = value['selector']
-            index = value['index']
-            method = value['method']
-            new_rule_lines.append(f"        '{key}': {{'selector': '{selector}', 'index': {index}, 'method': '{method}'}},\n")
-        new_rule_lines.append("    },\n")
-
-        new_lines = lines[:start_index + 1]
-        new_lines.extend(new_rule_lines)
+        # Convert the AST dictionary to a Python dictionary
+        current_rules = ast.literal_eval(assignment_node.value)
         
-        in_old_book_entry = False
-        for line in lines[start_index + 1 : end_index]:
-            if f"'{book_name}':" in line:
-                in_old_book_entry = True
-            if '}' in line and in_old_book_entry:
-                in_old_book_entry = False
-                continue
-            if not in_old_book_entry:
-                new_lines.append(line)
-        new_lines.append(lines[end_index])
-        new_lines.extend(lines[end_index + 1:])
-
-        with open(CONFIG_PATH, 'w', encoding='utf-8') as f:
-            f.writelines(new_lines)
+        # Update the rules for the specific book
+        current_rules[book_name] = confirmed_rules
         
+        # Sort the dictionary by book name for consistent ordering
+        sorted_rules = dict(sorted(current_rules.items()))
+
+        # Find the line numbers of the dictionary to replace
+        start_line = assignment_node.lineno
+        end_line = assignment_node.end_lineno
+        
+        original_lines = content.splitlines(keepends=True)
+        lines_before = original_lines[:start_line-1]
+        lines_after = original_lines[end_line:]
+
+        # Pretty-print the updated dictionary to a string
+        new_rules_str = pprint.pformat(sorted_rules, indent=4, width=120)
+        
+        # Reconstruct the file
+        new_content = "".join(lines_before)
+        new_content += f"{RULES_VAR_NAME} = {new_rules_str}\n"
+        new_content += "".join(lines_after)
+
+        CONFIG_PATH.write_text(new_content, encoding='utf-8')
         print("✅ Config file updated successfully!")
 
     except Exception as e:
@@ -141,10 +125,6 @@ def update_config_file(book_name, confirmed_rules):
 def save_markdown_file(post: frontmatter.Post, filepath: Path):
     """
     Safely saves a frontmatter.Post object to a file.
-
-    Args:
-        post: The frontmatter Post object containing metadata and content.
-        filepath: The Path object representing the destination file.
     """
     try:
         new_file_content = frontmatter.dumps(post)

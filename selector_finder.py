@@ -2,53 +2,70 @@
 
 import argparse
 import re
+import pprint
 from pathlib import Path
 from urllib.request import urlopen
 from bs4 import BeautifulSoup
 from reclassification_manager import add_reclassified_url
 from parser import parse_html_with_rules
 from file_system import update_config_file
-
-# --- Configuration ---
-CONFIG_PATH = Path("./config.py")
-RULES_VAR_NAME = "BOOK_SCRAPING_RULES"
+from config import RULES_VAR_NAME
+from processing import correct_text_spacing
 
 def suggest_selectors(soup):
     """
     Analyzes the HTML and suggests potential rules (selector + index) for different data types.
+    This version now generates more specific selectors for paragraph tags.
     """
     suggestions = { 'name': [], 'genus': [], 'citation': [], 'content': [] }
     
-    # Heuristic 1: Bold tags for name and genus
+    # Heuristic 1: Bold tags for name and genus (remains simple)
     b_tags = soup.select('b')
     for i, tag in enumerate(b_tags):
         text = " ".join(tag.get_text(strip=True, separator=' ').split())
+        text = correct_text_spacing(text)
         rule = {'selector': 'b', 'index': i}
         if 2 < len(text) < 100:
-            # Add the same reliable rule suggestion for both name and genus
             suggestions['name'].append((rule, text))
             suggestions['genus'].append((rule, text))
 
-    # Heuristic 2: Paragraph tags for content and citation
-    p_tags = soup.select('p')
-    for i, tag in enumerate(p_tags):
-        text = " ".join(tag.get_text(strip=True, separator=' ').split())
-        rule = {'selector': 'p', 'index': i}
-        if len(text) > 150:
-             suggestions['content'].append((rule, text[:150] + "..."))
-        if re.search(r'\b(19|20)\d{2}\b', text) and len(text) < 200:
-            suggestions['citation'].append((rule, text))
+    # Heuristic 2: Paragraph tags with enhanced selector generation
+    processed_tags = set() # Track tags to avoid duplicate suggestions
+
+    # Prioritize more specific selectors first
+    candidate_selectors = [
+        'p[align="justify"]',
+        'p[style*="text-align:justify"]',
+        'p' # Generic fallback
+    ]
+
+    for selector in candidate_selectors:
+        matched_tags = soup.select(selector)
+        for i, tag in enumerate(matched_tags):
+            # Use the tag's object id to see if we've already processed it
+            # under a more specific selector.
+            if id(tag) in processed_tags:
+                continue
+            
+            processed_tags.add(id(tag))
+            
+            text = " ".join(tag.get_text(strip=True, separator=' ').split())
+            rule = {'selector': selector, 'index': i}
+
+            # Add suggestions based on content heuristics
+            if len(text) > 150:
+                suggestions['content'].append((rule, text[:150] + "..."))
+            if re.search(r'\b(19|20)\d{2}\b', text) and len(text) < 200:
+                suggestions['citation'].append((rule, text))
             
     return suggestions
 
 def get_user_choice(data_type, suggestions, soup):
     """
     Displays suggestions and gets the user's choice for a rule (selector + index) AND a method.
-    Skips the method prompt for the 'content' field.
     """
     print(f"\n--- Finding Rule for: {data_type.upper()} ---")
     
-    # --- Step 1: Choose a selector and index ---
     print("Step 1: Choose a selector and index.")
     for i, (rule, text) in enumerate(suggestions, 1):
         print(f"[{i}] Selector: '{rule['selector']}' (Match #{rule['index'] + 1}) -> Extracts: \"{text}\"")
@@ -68,19 +85,16 @@ def get_user_choice(data_type, suggestions, soup):
         except (ValueError, IndexError):
             if not chosen_rule: print("Invalid choice, please try again.")
 
-    # --- Step 2: Choose the Method (Conditional) ---
-    
-    # For body content, we always want the full text.
     if data_type == 'content':
         print(f"  -> Method for 'content' is always 'full_text'.")
         return chosen_rule, 'full_text'
 
-    # For all other fields, show the method prompt.
     elements = soup.select(chosen_rule['selector'])
     raw_text = ""
     if len(elements) > chosen_rule['index']:
         element = elements[chosen_rule['index']]
         raw_text = " ".join(element.get_text(strip=True, separator=' ').split())
+        raw_text = correct_text_spacing(raw_text)
 
     print(f"\nRule (selector: '{chosen_rule['selector']}', index: {chosen_rule['index']}) extracted: \"{raw_text}\"")
     print("Step 2: How should this text be processed?")
@@ -100,7 +114,7 @@ def get_user_choice(data_type, suggestions, soup):
             if target_word in raw_text:
                 tokens = raw_text.split()
                 if target_word in tokens:
-                    if target_word.islower():
+                    if target_word.islower() or target_word.isdigit():
                         return chosen_rule, 'first_lowercase'
                     elif target_word.istitle():
                         return chosen_rule, 'first_titlecase'
@@ -108,7 +122,7 @@ def get_user_choice(data_type, suggestions, soup):
             else:
                 print("Target word not found in extracted text.")
 
-def run_interactive_selector_finder(book_name, sample_url, existing_rules=None):
+def run_interactive_selector_finder(book_name, sample_url, genus_fallback, existing_rules=None, failed_fields=None):
     """
     The core logic of the selector finder, now using the unified parser for verification.
     """
@@ -150,12 +164,18 @@ def run_interactive_selector_finder(book_name, sample_url, existing_rules=None):
         if existing_rules and field_key in existing_rules:
             print(f"\n--- Verifying Rule for: {field.upper()} ---")
             
-            parsed_data = parse_html_with_rules(soup, existing_rules, "N/A")
-            extracted_text = parsed_data.get(field)
+            parsed_data = parse_html_with_rules(soup, existing_rules, genus_fallback)
+            
+            lookup_key = 'body_content' if field == 'content' else ('citations' if field == 'citation' else field)
+            extracted_text = parsed_data.get(lookup_key)
             
             print(f"Current Rule: {existing_rules.get(field_key)}")
             if isinstance(extracted_text, list): extracted_text = " ".join(extracted_text)
-            print(f"Extracted Text: \"{extracted_text[:200]}\"")
+
+            if extracted_text:
+                print(f"Extracted Text: \"{extracted_text[:200]}\"")
+            else:
+                print("Extracted Text: \"\" (None Found)")
             
             while True:
                 choice = input("Is this correct? [Y/n/s]: ").lower()
@@ -182,8 +202,41 @@ def run_interactive_selector_finder(book_name, sample_url, existing_rules=None):
                     confirmed_rules[field_key]['method'] = method
 
     if confirmed_rules and confirmed_rules != existing_rules:
-        update_config_file(book_name, confirmed_rules)
-        return 'rules_updated'
+        print("\n" + "="*25)
+        print("--- FINAL CONFIRMATION ---")
+        print("Applying the new rules to the sample URL produces the following data:")
+
+        final_data = parse_html_with_rules(soup, confirmed_rules, genus_fallback)
+
+        print(f"  - Name:     {final_data.get('name')}")
+        
+        final_genus = final_data.get('genus')
+        raw_genus = final_data.get('scraped_genus_raw')
+
+        print(f"  - Genus:    {final_genus}")
+        if (raw_genus and genus_fallback and raw_genus.lower() != genus_fallback.lower()):
+            print("  -> ⚠️  WARNING: Genus discrepancy found!")
+            print(f"     Inherited Context: {genus_fallback}")
+            print(f"     Scraped from Page: {raw_genus}")
+        
+        print(f"  - Author:   {final_data.get('author')}")
+        citations = final_data.get('citations', [])
+        print(f"  - Citations:{' '.join(citations) if citations else 'None'}")
+        
+        body_snippet = final_data.get('body_content', '').strip().replace('\n', ' ')
+        print(f"  - Content:  {body_snippet[:100]}...")
+        print("="*25)
+
+        while True:
+            choice = input("\nSave these new rules to config.py? [Y/n]: ").lower().strip()
+            if choice in ('y', 'yes', ''):
+                update_config_file(book_name, confirmed_rules)
+                return 'rules_updated'
+            elif choice in ('n', 'no'):
+                print("Aborted. No changes have been saved.")
+                return 'no_change'
+            else:
+                print("Invalid choice. Please enter 'y' or 'n'.")
     else:
         print("\nNo changes made to rules.")
         return 'no_change'
@@ -192,6 +245,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Interactively find and save CSS selectors for the MoB scraper.")
     parser.add_argument("book_name", help="The name of the book (e.g., 'eleven').")
     parser.add_argument("sample_url", help="A full URL to a sample page from the book.")
+    parser.add_argument("--genus_fallback", help="Optional fallback genus for standalone testing.", default="TestGenus")
     args = parser.parse_args()
     
-    run_interactive_selector_finder(args.book_name, args.sample_url)
+    run_interactive_selector_finder(args.book_name, args.sample_url, args.genus_fallback)
