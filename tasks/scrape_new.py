@@ -14,7 +14,7 @@ from file_system import (
 )
 from scraper import SpeciesScraper
 from tasks.utils import get_contextual_data
-from selector_finder import run_interactive_selector_finder
+from tasks.interactive_cli import run_interactive_session
 from reclassification_manager import load_reclassified_urls
 
 
@@ -138,7 +138,7 @@ def run_scrape_new(generate_files=False, interactive=False):
 
             if book_name not in config.BOOK_SCRAPING_RULES:
                 print(f"\n[!] No rules found for book: '{book_name}'.")
-                status = run_interactive_selector_finder(book_name, url_to_test, context_genus)
+                status = run_interactive_session(book_name, url_to_test, context_genus)
                 if status == 'skip_book': books_to_skip.add(book_name)
                 elif status in ['reclassified', 'rules_updated']: importlib.reload(config)
                 continue
@@ -156,7 +156,7 @@ def run_scrape_new(generate_files=False, interactive=False):
             if failed_fields:
                 print(f"  -> [!] Low confidence for {Path(url_to_test).name}. Failing fields: {failed_fields}")
                 existing_rules = config.BOOK_SCRAPING_RULES.get(book_name, {})
-                status = run_interactive_selector_finder(
+                status = run_interactive_session(
                     book_name, url_to_test, context_genus, existing_rules=existing_rules, failed_fields=failed_fields
                 )
                 if status == 'skip_book': books_to_skip.add(book_name)

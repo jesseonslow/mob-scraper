@@ -1,23 +1,23 @@
-# mob-scraper/tasks/cleanup.py
+# tasks/cleanup.py
 
 import frontmatter
 import re
 from pathlib import Path
 from bs4 import BeautifulSoup
 
-# Import from our modular project structure
 from config import (
     MARKDOWN_DIR, PHP_ROOT_DIR, LEGACY_URL_BASE, GROUP_MAPPING,
-    FIELDS_TO_DELETE
+    FIELDS_TO_DELETE, BOOK_NUMBER_MAP  # <-- Add BOOK_NUMBER_MAP
 )
 from file_system import save_markdown_file
-from scraper import SpeciesScraper
+# OLD: from scraper import SpeciesScraper
+# NEW: Import both the function and the class
+from scraper import SpeciesScraper, scrape_images_and_labels
 from processing import clean_citation_frontmatter
 
 def _update_image_fields(post, genus_name):
     """
     Updates the post's frontmatter with structured and labeled image data.
-   
     """
     legacy_url = post.metadata.get("legacy_url")
     book_name = post.metadata.get("book", "Unknown")
@@ -33,8 +33,9 @@ def _update_image_fields(post, genus_name):
     with open(php_path, 'r', encoding='utf-8', errors='ignore') as f:
         soup = BeautifulSoup(f.read(), 'html.parser')
 
-    scraper = SpeciesScraper(soup, book_name, genus_name)
-    plates, genitalia, misc_images = scraper.scrape_images_and_labels()
+    # This is the corrected, direct function call
+    book_number = BOOK_NUMBER_MAP.get(book_name)
+    plates, genitalia, misc_images = scrape_images_and_labels(soup, book_name, book_number)
 
     # Clean out all old image-related keys before adding new ones
     for key in ['image_urls', 'images', 'genitalia', 'plates', 'misc_images']:

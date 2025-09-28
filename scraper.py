@@ -1,4 +1,3 @@
-# scraper.py
 from bs4 import BeautifulSoup
 import re
 from pathlib import Path
@@ -73,15 +72,17 @@ class SpeciesScraper:
     def scrape_all(self):
         """
         Executes all scraping methods and returns a consolidated dictionary of data.
+        This is the single source of truth for scraping.
         """
-        # --- THIS IS THE FIX ---
-        # The text_data dictionary is now correctly initialized with the parser's results.
+        # 1. Get all text data using the unified, rule-based parser
         text_data = parse_html_with_rules(self.soup, self.rules, self.genus_fallback)
         
+        # 2. Get all image data
         plates, genitalia, misc_images = scrape_images_and_labels(
             self.soup, self.book_name, self.book_number
         )
         
+        # 3. Combine and return the final dictionary
         text_data.update({
             "plates": plates,
             "genitalia": genitalia,
