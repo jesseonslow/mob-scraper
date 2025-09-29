@@ -16,40 +16,9 @@ from file_system import (
     create_markdown_file
 )
 from scraper import SpeciesScraper
-from tasks.utils import get_contextual_data, get_book_from_url
+from tasks.utils import get_contextual_data, get_book_from_url, is_data_valid
 from tasks.interactive_cli import run_interactive_session
 from reclassification_manager import load_reclassified_urls
-
-
-def _is_data_valid(scraped_data: dict):
-    """
-    Performs a comprehensive quality check and returns a list of failing fields.
-    """
-    failures = []
-    name = scraped_data.get("name")
-    genus = scraped_data.get("genus")
-    body = scraped_data.get("body_content", "")
-    author = scraped_data.get("author")
-
-    # --- Name Validation ---
-    if (not name or name == "Unknown" or '\ufffd' in name or
-            name in config.KNOWN_TAXONOMIC_STATUSES or name == author):
-        failures.append('name')
-    
-    # --- Genus Validation (Now with status check) ---
-    if not genus or genus == "Unknown" or genus in config.KNOWN_TAXONOMIC_STATUSES:
-        failures.append('genus')
-
-    # --- Author Validation (Now checks for existence) ---
-    if not author:
-        failures.append('author')
-
-    # --- Content Validation ---
-    if len(body.strip()) < 50:
-        failures.append('content')
-
-    return failures
-
 
 def run_scrape_new(generate_files=False, interactive=False):
     """
@@ -111,11 +80,11 @@ def run_scrape_new(generate_files=False, interactive=False):
             relative_path = url_to_test.replace(config.LEGACY_URL_BASE, "")
             php_path = config.PHP_ROOT_DIR / relative_path
             with open(php_path, 'r', encoding='utf-8', errors='ignore') as f:
-                soup = BeautifulSoup(f.read(), 'html.parser')
+                html_content = f.read()
             
-            scraper = SpeciesScraper(soup, book_name, context_genus)
+            scraper = SpeciesScraper(html_content, book_name, context_genus)
             scraped_data = scraper.scrape_all()
-            failed_fields = _is_data_valid(scraped_data)
+            failed_fields = is_data_valid(scraped_data)
 
             if failed_fields:
                 print(f"  -> [!] Low confidence for {Path(url_to_test).name}. Failing fields: {failed_fields}")
@@ -147,28 +116,30 @@ def run_scrape_new(generate_files=False, interactive=False):
             if not php_path.exists(): continue
 
             with open(php_path, 'r', encoding='utf-8', errors='ignore') as f:
-                soup = BeautifulSoup(f.read(), 'html.parser')
+                html_content = f.read()
             
             context_genus = entry['neighbor_data'].get('genus') if entry['context_type'] == 'species' else entry['neighbor_data'].get('name')
-            scraper = SpeciesScraper(soup, book_name, context_genus)
+            
+            # 2. Pass the raw HTML string (not the soup object) to the scraper.
+            scraper = SpeciesScraper(html_content, book_name, context_genus)
             scraped_data = scraper.scrape_all()
             
-            failed_fields = _is_data_valid(scraped_data)
+            failed_fields = is_data_valid(scraped_data)
             
             if not failed_fields:
                 create_markdown_file(entry, scraped_data, book_name)
                 created_count += 1
             else:
-                    print(f"\n-> [ERROR] Skipping {Path(url).name}: Scraped data is invalid.")
-                    print(f"   - Book: {book_name}")
-                    print(f"   - Failed Fields: {', '.join(failed_fields)}")
-                    print("   --- Scraped Data ---")
-                    print(f"   Name:     '{scraped_data.get('name')}'")
-                    print(f"   Genus:    '{scraped_data.get('genus')}'")
-                    print(f"   Author:   '{scraped_data.get('author')}'")
-                    content_snippet = scraped_data.get('body_content', '').strip().replace('\n', ' ')
-                    print(f"   Content:  '{content_snippet[:100]}...'")
-                    print("   --------------------")
+                print(f"\n-> [ERROR] Skipping {Path(url).name}: Scraped data is invalid.")
+                print(f"   - Book: {book_name}")
+                print(f"   - Failed Fields: {', '.join(failed_fields)}")
+                print("   --- Scraped Data ---")
+                print(f"   Name:     '{scraped_data.get('name')}'")
+                print(f"   Genus:    '{scraped_data.get('genus')}'")
+                print(f"   Author:   '{scraped_data.get('author')}'")
+                content_snippet = scraped_data.get('body_content', '').strip().replace('\n', ' ')
+                print(f"   Content:  '{content_snippet[:100]}...'")
+                print("   --------------------")
         print(f"\n✨ Live run complete. Generated {created_count} file(s).")
     
     if not generate_files and not interactive:

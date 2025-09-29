@@ -2,3 +2,4 @@ python-frontmatter
 beautifulsoup4
 markdownify
 PyYAML
+mdformat

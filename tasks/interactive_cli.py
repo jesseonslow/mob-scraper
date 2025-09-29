@@ -8,6 +8,7 @@ from file_system import update_config_file, create_markdown_file
 from processing import correct_text_spacing
 from selector_finder import suggest_selectors
 from tasks.utils import get_book_from_url, is_data_valid
+from scraper import SpeciesScraper, scrape_images_and_labels
 
 def _get_user_choice(data_type, suggestions, soup):
     """Displays suggestions and gets the user's choice for a rule and method."""
@@ -19,6 +20,7 @@ def _get_user_choice(data_type, suggestions, soup):
     print("\n[c] Enter a custom selector")
 
     if data_type == 'citation':
+        print("[b] Use the citation builder (for fragmented citations)")
         print("[n] No citations on this page")
     print("[s] Skip this rule for now")
     
@@ -28,6 +30,18 @@ def _get_user_choice(data_type, suggestions, soup):
         
         if choice == 's' or (data_type == 'citation' and choice == 'n'):
             return None, None
+
+        if data_type == 'citation' and choice == 'b':
+            print("\n--- Citation Builder ---")
+            print("Enter the selector for the PARENT element containing all citation fragments.")
+            custom_selector = input("Enter parent CSS selector: ")
+            try:
+                custom_index = int(input("Enter the match number (e.g., 1 for the first): "))
+                rule = {'selector': custom_selector, 'index': custom_index - 1}
+                return rule, 'build_citation_string'
+            except ValueError:
+                print("Invalid number. Aborting.")
+                return None, None
 
         if choice == 'c':
             custom_selector = input("Enter custom CSS selector: ")
@@ -65,6 +79,8 @@ def _get_user_choice(data_type, suggestions, soup):
     print("Step 2: How should this text be processed?")
     print("[1] Use the full text (intelligent parser will attempt to split it)")
     print("[2] Get word by its position in the text")
+    if data_type == 'citation':
+        print("[3] Build citation from mixed content")
     print("[p] Paste the target word to generate a reliable method")
     
     while True:
@@ -73,10 +89,14 @@ def _get_user_choice(data_type, suggestions, soup):
             return chosen_rule, 'full_text'
         elif method_choice == '2':
             try:
-                pos = int(input("Enter position (e.g., 1 for first, 2 for second, -1 for last): "))
+                pos = int(input("Enter position (e.g., 1 for first, 2 for second, --1 for last): "))
                 return chosen_rule, f'position_{pos}'
             except ValueError:
                 print("Invalid number. Please enter an integer.")
+        # --- THIS IS THE FIX ---
+        # Handle the new choice
+        elif data_type == 'citation' and method_choice == '3':
+            return chosen_rule, 'build_citation_string'
         elif method_choice == 'p':
             target_word = input(f"Paste the exact word you want to extract from \"{raw_text}\": ").strip()
             if target_word in raw_text:
@@ -165,7 +185,20 @@ def run_interactive_session(entry_data, existing_rules=None, failed_fields=None)
             return 'no_change'
 
         print("\n" + "="*25 + "\n--- RE-VALIDATING NEW RULES ---")
+        # Step 1: Get text data using the new rules
         final_data = parse_html_with_rules(soup, confirmed_rules, context_genus)
+        
+        # Step 2: Get image data
+        book_number = config.BOOK_NUMBER_MAP.get(book_name)
+        plates, genitalia, misc_images = scrape_images_and_labels(soup, book_name, book_number)
+        
+        # Step 3: Combine them into the final data object
+        final_data.update({
+            "plates": plates,
+            "genitalia": genitalia,
+            "misc_images": misc_images
+        })
+
         new_failed_fields = is_data_valid(final_data)
 
         if not new_failed_fields:

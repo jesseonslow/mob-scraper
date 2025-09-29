@@ -3,6 +3,7 @@ import re
 from pathlib import Path
 from config import BOOK_NUMBER_MAP, BOOK_SCRAPING_RULES, CDN_BASE_URL, DEFAULT_PLATE
 from parser import parse_html_with_rules
+from html_preprocessor import remove_font_tags
 
 def scrape_images_and_labels(soup: BeautifulSoup, book_name: str, book_number: str) -> tuple:
     """
@@ -62,8 +63,14 @@ class SpeciesScraper:
     """
     Orchestrates the scraping of a species page by calling specialized modules.
     """
-    def __init__(self, soup: BeautifulSoup, book_name: str, genus_name: str):
-        self.soup = soup
+    def __init__(self, html_content: str, book_name: str, genus_name: str):
+        # --- THIS IS THE FIX ---
+        # 1. Clean the raw HTML before parsing.
+        cleaned_html = remove_font_tags(html_content)
+        
+        # 2. Parse the *cleaned* HTML with BeautifulSoup.
+        self.soup = BeautifulSoup(cleaned_html, 'html.parser')
+        
         self.book_name = book_name
         self.book_number = BOOK_NUMBER_MAP.get(book_name)
         self.genus_fallback = genus_name

@@ -4,6 +4,7 @@ from bs4 import BeautifulSoup
 from markdownify import markdownify
 from processing import format_body_content, correct_text_spacing
 from config import KNOWN_TAXONOMIC_STATUSES
+from citation_scraper import scrape_and_format_citation
 
 def _apply_method(text: str, method: str) -> str:
     """Applies a specific post-processing method to the extracted text."""
@@ -67,18 +68,16 @@ def parse_html_with_rules(soup: BeautifulSoup, rules: dict, genus_fallback: str)
     genus_rule = rules.get('genus_selector', {})
     author_rule = rules.get('author_selector', {})
 
-    # --- Step 1: Extract all raw text blocks based on defined rules ---
     full_name_text = _get_text_from_rule(soup, name_rule)
     full_genus_text = _get_text_from_rule(soup, genus_rule) if genus_rule else full_name_text
     full_author_text = _get_text_from_rule(soup, author_rule)
     
-    # --- Step 2: Always check for taxonomic status in the main name string ---
+    combined_text_for_status_check = (full_name_text + " " + full_genus_text).lower()
     taxonomic_status = []
     for status in KNOWN_TAXONOMIC_STATUSES:
-        if status in full_name_text.lower():
+        if status in combined_text_for_status_check:
             taxonomic_status.append(status)
 
-    # --- Step 3: Scrape individual fields ---
     name_method = name_rule.get('method', 'full_text')
     
     # Use specific methods if they exist
@@ -143,7 +142,14 @@ def parse_html_with_rules(soup: BeautifulSoup, rules: dict, genus_fallback: str)
     citation_rule = rules.get('citation_selector', {})
     citations = []
     if citation_rule:
-        citation_text = _get_text_from_rule(soup, citation_rule)
+        citation_text = None
+        if citation_rule.get('method') == 'build_citation_string':
+            # Use the new specialized scraper for complex cases
+            citation_text = scrape_and_format_citation(soup, citation_rule)
+        else:
+            # Use the standard text extraction for simple cases
+            citation_text = _get_text_from_rule(soup, citation_rule)
+        
         if citation_text:
             citations.append(citation_text)
 

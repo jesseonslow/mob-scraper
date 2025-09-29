@@ -10,8 +10,6 @@ from config import (
     FIELDS_TO_DELETE, BOOK_NUMBER_MAP  # <-- Add BOOK_NUMBER_MAP
 )
 from file_system import save_markdown_file
-# OLD: from scraper import SpeciesScraper
-# NEW: Import both the function and the class
 from scraper import SpeciesScraper, scrape_images_and_labels
 from processing import clean_citation_frontmatter
 

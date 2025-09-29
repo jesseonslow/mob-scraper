@@ -70,6 +70,15 @@ def is_data_valid(scraped_data: dict):
     if (not name or name == "Unknown" or '\ufffd' in name or
             name in config.KNOWN_TAXONOMIC_STATUSES or name == author):
         failures.append('name')
+    else:
+        special_valid_names = ['sp.']
+        if name not in special_valid_names:
+            tokens = name.split()
+            if tokens:
+                first_token = tokens[0]
+                if not (first_token.islower() or first_token.isdigit() or first_token.startswith('?')):
+                    if 'name' not in failures:
+                        failures.append('name')
     
     if not genus or genus == "Unknown" or genus in config.KNOWN_TAXONOMIC_STATUSES:
         failures.append('genus')
