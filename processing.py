@@ -1,6 +1,7 @@
 import re
 import yaml
 import frontmatter
+from link_rewriter import rewrite_legacy_links
 
 def format_body_content(markdown_text: str):
     """
@@ -42,13 +43,15 @@ def format_body_content(markdown_text: str):
         processed_text = pattern.sub(replacer, processed_text)
     
     # Add line breaks after sentences ending with a period followed by a capital letter
-    processed_text = re.sub(r'([a-z]{2,})\.\s+(?=[A-Z])', r'\\1.\\n\\n', processed_text)
+    processed_text = re.sub(r'([a-z]{2,})\.\s+(?=[A-Z])', r'\1.\n\n', processed_text)
     # Clean up stray periods that are now at the start of a line
     processed_text = re.sub(r'\n\s*\.\s*', '\n', processed_text)
     # Consolidate multiple newlines into a maximum of two
     processed_text = re.sub(r'\n{3,}', '\n\n', processed_text)
     
-    return processed_text.strip()
+    final_text = rewrite_legacy_links(processed_text)
+    
+    return final_text.strip()
 
 def clean_citation_frontmatter(fm_string: str):
     """

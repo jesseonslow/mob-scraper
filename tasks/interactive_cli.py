@@ -1,5 +1,3 @@
-# tasks/interactive_cli.py
-
 import argparse
 from urllib.request import urlopen
 from bs4 import BeautifulSoup
@@ -9,7 +7,7 @@ from parser import parse_html_with_rules
 from file_system import update_config_file, create_markdown_file
 from processing import correct_text_spacing
 from selector_finder import suggest_selectors
-from tasks.utils import get_book_from_url
+from tasks.utils import get_book_from_url, is_data_valid
 
 def _get_user_choice(data_type, suggestions, soup):
     """Displays suggestions and gets the user's choice for a rule and method."""
@@ -19,56 +17,80 @@ def _get_user_choice(data_type, suggestions, soup):
     for i, (rule, text) in enumerate(suggestions, 1):
         print(f"[{i}] Selector: '{rule['selector']}' (Match #{rule['index'] + 1}) -> Extracts: \"{text}\"")
     print("\n[c] Enter a custom selector")
-    print("[s] Skip this rule")
+
+    if data_type == 'citation':
+        print("[n] No citations on this page")
+    print("[s] Skip this rule for now")
     
     chosen_rule = None
     while not chosen_rule:
         choice = input(f"Enter your choice for '{data_type}' selector: ").lower()
-        if choice == 's': return None, None
+        
+        if choice == 's' or (data_type == 'citation' and choice == 'n'):
+            return None, None
+
         if choice == 'c':
             custom_selector = input("Enter custom CSS selector: ")
-            chosen_rule = {'selector': custom_selector, 'index': 0}
+            try:
+                custom_index = int(input("Enter the match number (e.g., 1 for the first, 2 for the second): "))
+                chosen_rule = {'selector': custom_selector, 'index': custom_index - 1}
+                break
+            except ValueError:
+                print("Invalid number. Defaulting to the first match (index 0).")
+                chosen_rule = {'selector': custom_selector, 'index': 0}
+                break
+
         try:
             if 1 <= int(choice) <= len(suggestions):
                 chosen_rule = suggestions[int(choice) - 1][0]
         except (ValueError, IndexError):
-            if not chosen_rule: print("Invalid choice, please try again.")
+            print("Invalid choice, please try again.")
+
+    if not chosen_rule:
+        return None, None
 
     if data_type == 'content':
         return chosen_rule, 'full_text'
 
     elements = soup.select(chosen_rule['selector'])
     raw_text = ""
-    if elements and len(elements) > chosen_rule['index']:
+    if elements and 0 <= chosen_rule['index'] < len(elements):
         element = elements[chosen_rule['index']]
         raw_text = " ".join(element.get_text(strip=True, separator=' ').split())
         raw_text = correct_text_spacing(raw_text)
+    else:
+        print(f"  -> WARNING: Selector '{chosen_rule['selector']}' with index {chosen_rule['index']} found no match.")
 
     print(f"\nRule (selector: '{chosen_rule['selector']}', index: {chosen_rule['index']}) extracted: \"{raw_text}\"")
     print("Step 2: How should this text be processed?")
-    print("[1] Use the full text")
-    print("[2] Get word by position (e.g., first, last)")
-    print("[p] Paste the target word to generate a rule")
+    print("[1] Use the full text (intelligent parser will attempt to split it)")
+    print("[2] Get word by its position in the text")
+    print("[p] Paste the target word to generate a reliable method")
     
     while True:
         method_choice = input("Enter your choice for method: ").lower()
         if method_choice == '1':
             return chosen_rule, 'full_text'
         elif method_choice == '2':
-            pos = int(input("Enter position (1 for first, 2 for second, -1 for last): "))
-            return chosen_rule, f'position_{pos}'
+            try:
+                pos = int(input("Enter position (e.g., 1 for first, 2 for second, -1 for last): "))
+                return chosen_rule, f'position_{pos}'
+            except ValueError:
+                print("Invalid number. Please enter an integer.")
         elif method_choice == 'p':
-            target_word = input(f"Paste the exact word you want to extract from \"{raw_text}\": ")
+            target_word = input(f"Paste the exact word you want to extract from \"{raw_text}\": ").strip()
             if target_word in raw_text:
                 tokens = raw_text.split()
-                if target_word in tokens:
-                    if target_word.islower() or target_word.isdigit():
-                        return chosen_rule, 'first_lowercase'
-                    elif target_word.istitle():
-                        return chosen_rule, 'first_titlecase'
-                print("Could not generate a reliable rule. Please try another method.")
+                try:
+                    idx = tokens.index(target_word)
+                    position = idx + 1
+                    print(f"  -> Detected '{target_word}' at position {position}.")
+                    return chosen_rule, f'position_{position}'
+                except ValueError:
+                    print("Could not find the exact word as a distinct token. Please try another method.")
             else:
-                print("Target word not found in extracted text.")
+                print(f"The word '{target_word}' was not found in the extracted text.")
+
 
 def run_interactive_session(entry_data, existing_rules=None, failed_fields=None):
     """The main interactive loop for defining and verifying scraper rules."""
@@ -87,71 +109,94 @@ def run_interactive_session(entry_data, existing_rules=None, failed_fields=None)
         print(f"Error loading source for '{sample_url}': {e}"); return 'error'
 
     suggestions = suggest_selectors(soup)
-    confirmed_rules = existing_rules.copy() if existing_rules else {}
-    fields_to_find = ['name', 'genus', 'citation', 'content']
     
-    for field in fields_to_find:
-        field_key = f"{field}_selector"
+    while True:
+        current_rules = existing_rules.copy() if existing_rules else {}
+        confirmed_rules = {}
 
-        if existing_rules and failed_fields is not None and field not in failed_fields:
-            print(f"--- Verifying Rule for: {field.upper()} ---")
-            print("  -> Rule assumed to be correct. Skipping.")
-            continue
+        fields_to_find = ['name', 'genus', 'author', 'citation', 'content']
         
-        if existing_rules and field_key in existing_rules:
-            print(f"\n--- Verifying Rule for: {field.upper()} ---")
-            parsed_data = parse_html_with_rules(soup, existing_rules, context_genus)
-            lookup_key = 'body_content' if field == 'content' else ('citations' if field == 'citation' else field)
-            extracted_text = parsed_data.get(lookup_key, "")
-            if isinstance(extracted_text, list): extracted_text = " ".join(extracted_text)
+        for field in fields_to_find:
+            field_key = f"{field}_selector"
             
-            print(f"Current Rule: {existing_rules.get(field_key)}")
-            print(f"Extracted Text: \"{extracted_text[:200]}\"")
+            if field == 'author':
+                temp_data = parse_html_with_rules(soup, confirmed_rules, context_genus)
+                if temp_data.get('author') == 'Holloway':
+                    print("\n--- Verifying Rule for: AUTHOR ---")
+                    print("  -> Author automatically set to 'Holloway' based on species name rule. Skipping.")
+                    continue
             
-            while True:
-                choice = input("Is this correct? [Y/n/s]: ").lower()
+            if failed_fields and field not in failed_fields and field_key in current_rules:
+                print(f"--- Verifying Rule for: {field.upper()} ---")
+                print("  -> Rule assumed to be correct. Skipping.")
+                confirmed_rules[field_key] = current_rules[field_key]
+                continue
+            
+            if field_key in current_rules:
+                print(f"\n--- Verifying Rule for: {field.upper()} ---")
+                parsed_data = parse_html_with_rules(soup, current_rules, context_genus)
+                lookup_key = 'body_content' if field == 'content' else ('citations' if field == 'citation' else field)
+                extracted_text = parsed_data.get(lookup_key, "")
+                if isinstance(extracted_text, list): extracted_text = " ".join(extracted_text)
+                
+                print(f"Current Rule: {current_rules.get(field_key)}")
+                print(f"Extracted Text: \"{extracted_text[:200]}\"")
+                
+                choice = 'n'
+                if not failed_fields or field not in failed_fields:
+                    choice = input("Is this correct? [Y/n/s]: ").lower()
+
                 if choice in ('y', ''):
-                    confirmed_rules[field_key] = existing_rules[field_key]
-                    break
+                    confirmed_rules[field_key] = current_rules[field_key]
                 elif choice == 'n':
                     rule, method = _get_user_choice(field, suggestions.get(field, []), soup)
-                    if rule:
+                    if rule and method:
                         confirmed_rules[field_key] = {'selector': rule['selector'], 'index': rule['index'], 'method': method}
-                    break
                 elif choice == 's':
                     if field_key in confirmed_rules: del confirmed_rules[field_key]
-                    print(f"  -> Rule for '{field}' will be removed."); break
-        else:
-            rule, method = _get_user_choice(field, suggestions.get(field, []), soup)
-            if rule:
-                confirmed_rules[field_key] = {'selector': rule['selector'], 'index': rule['index'], 'method': method}
+                    print(f"  -> Rule for '{field}' will be removed.")
+            else:
+                rule, method = _get_user_choice(field, suggestions.get(field, []), soup)
+                if rule and method:
+                    confirmed_rules[field_key] = {'selector': rule['selector'], 'index': rule['index'], 'method': method}
+        
+        if not confirmed_rules or confirmed_rules == existing_rules:
+            print("\nAborted. No changes have been made.")
+            return 'no_change'
 
-    if confirmed_rules and confirmed_rules != existing_rules:
-        print("\n" + "="*25 + "\n--- FINAL CONFIRMATION ---")
+        print("\n" + "="*25 + "\n--- RE-VALIDATING NEW RULES ---")
         final_data = parse_html_with_rules(soup, confirmed_rules, context_genus)
-        print(f"Applying new rules produces:\n  - Name: {final_data.get('name')}\n  - Genus: {final_data.get('genus')}\n  - Author: {final_data.get('author')}")
-        body_snippet = final_data.get('body_content', '').strip().replace('\n', ' ')
-        print(f"  - Content:  {body_snippet[:100]}...")
-        print("="*25)
+        new_failed_fields = is_data_valid(final_data)
 
-        choice = input("\nSave these new rules to config.py? [Y/n]: ").lower().strip()
-        if choice in ('y', 'yes', ''):
-            update_config_file(book_name, confirmed_rules)
-            save_choice = input("Rules saved. Save this scraped file now? [Y/n]: ").lower().strip()
-            if save_choice in ('y', 'yes', ''):
-                create_markdown_file(entry_data, final_data, book_name)
-                return 'rules_updated_and_file_saved'
-            return 'rules_updated'
-    
-    print("\nAborted. No changes have been made.")
-    return 'no_change'
+        if not new_failed_fields:
+            print("✅ Confidence check passed!")
+            print(f"Applying new rules produces:\n  - Name: {final_data.get('name')}\n  - Genus: {final_data.get('genus')}\n  - Author: {final_data.get('author')}")
+            
+            body_snippet = final_data.get('body_content', '').strip()
+            print("  - Content Preview:")
+            print("---")
+            print(f"{body_snippet[:200]}...")
+            print("---")
+            print("="*25)
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Interactively find CSS selectors for the MoB scraper.")
-    parser.add_argument("book_name", help="The name of the book (e.g., 'eleven').")
-    parser.add_argument("sample_url", help="A full URL to a sample page from the book.")
-    parser.add_argument("--genus_fallback", help="Optional fallback genus for testing.", default="TestGenus")
-    args = parser.parse_args()
-    
-    # This standalone mode won't be able to save a file, as it lacks the full 'entry_data'
-    run_interactive_session({'url': args.sample_url, 'neighbor_data': {}, 'context_type': 'genus'}, existing_rules=None, failed_fields=None)
+            choice = input("\nSave these new rules to config.py? [Y/n]: ").lower().strip()
+            if choice in ('y', 'yes', ''):
+                update_config_file(book_name, confirmed_rules)
+                save_choice = input("Rules saved. Save this scraped file now? [Y/n]: ").lower().strip()
+                if save_choice in ('y', 'yes', ''):
+                    create_markdown_file(entry_data, final_data, book_name)
+                    return 'rules_updated_and_file_saved'
+                return 'rules_updated'
+            else:
+                print("\nAborted. No changes have been made.")
+                return 'no_change'
+        else:
+            print(f"❌ Confidence check FAILED. The new rules are still producing invalid data.")
+            print(f"   Failing fields: {new_failed_fields}")
+            retry_choice = input("Would you like to try again? [Y/n]: ").lower().strip()
+            if retry_choice in ('n', 'no'):
+                print("\nAborted. No changes have been made.")
+                return 'no_change'
+            else:
+                existing_rules = confirmed_rules
+                failed_fields = new_failed_fields

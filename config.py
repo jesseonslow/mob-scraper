@@ -5,8 +5,9 @@ from pathlib import Path
 # --- CORE FILE SYSTEM PATHS ---
 # These paths define the root directories for your content, the PHP source files,
 # and where to save generated reports. They are fundamental to all operations.
-MARKDOWN_DIR = Path("../moths-of-borneo/src/content/species/")
+SPECIES_DIR = Path("../moths-of-borneo/src/content/species/")
 GENERA_DIR = Path("../moths-of-borneo/src/content/genera/")
+CONTENT_DIR = Path("../moths-of-borneo/src/content/")
 PHP_ROOT_DIR = Path("../MoB-PHP/")
 REPORT_DIR = Path("./html/")
 CONFIG_PATH = Path(__file__)
@@ -55,42 +56,42 @@ GROUP_MAPPING = {
 # This is the new, flexible rule-based system for the scraper.
 # Each book can have its own set of CSS selectors and extraction methods.
 RULES_VAR_NAME = "BOOK_SCRAPING_RULES"
-BOOK_SCRAPING_RULES = {   'default': {   'content_container_selector': 'p[align="justify"]',
-                   'name_selector': {'index': 2, 'method': 'first_lowercase', 'selector': 'b'}},
+BOOK_SCRAPING_RULES = {   'default': {   'content_selector': {'index': 0, 'method': 'full_text', 'selector': 'p[align="justify"]'},
+                   'name_selector': {'index': 2, 'method': 'full_text', 'selector': 'b'}},
     'eight': {   'content_selector': {'index': -1, 'method': 'full_text', 'selector': 'p[style*="text-align:justify"]'},
-                 'genus_selector': {'index': 1, 'method': 'first_word', 'selector': 'p b'},
-                 'name_selector': {'index': 1, 'method': 'last_word', 'selector': 'p b'}},
-    'eighteen': {   'citation_selector': {'index': 3, 'method': 'full_text', 'selector': 'p'},
+                 'genus_selector': {'index': 0, 'method': 'full_text', 'selector': 'span'},
+                 'name_selector': {'index': 1, 'method': 'position_1', 'selector': 'b'}},
+    'eighteen': {   'author_selector': {'index': 1, 'method': 'position_1', 'selector': 'span'},
+                    'citation_selector': {'index': 3, 'method': 'full_text', 'selector': 'p'},
                     'content_selector': {'index': -1, 'method': 'full_text', 'selector': 'p[align="justify"]'},
-                    'genus_selector': {'index': 2, 'method': 'first_word', 'selector': 'b'},
-                    'name_selector': {'index': 3, 'method': 'position_1', 'selector': 'b'}},
+                    'genus_selector': {'index': 2, 'method': 'full_text', 'selector': 'b'},
+                    'name_selector': {'index': 1, 'method': 'position_1', 'selector': 'b'}},
     'eleven': {   'content_selector': {'index': 4, 'method': 'full_text', 'selector': 'p'},
-                  'genus_selector': {'index': 2, 'method': 'position_1', 'selector': 'b'},
-                  'name_selector': {'index': 2, 'method': 'position_2', 'selector': 'b'}},
+                  'name_selector': {'index': 2, 'method': 'full_text', 'selector': 'b'}},
     'fifteen': {   'citation_selector': {'index': 3, 'method': 'full_text', 'selector': 'p'},
                    'content_selector': {'index': 0, 'method': 'full_text', 'selector': 'p[align="justify"]'},
-                   'genus_selector': {'index': 2, 'method': 'position_1', 'selector': 'b'},
-                   'name_selector': {'index': 0, 'method': 'position_2', 'selector': 'b'}},
+                   'genus_selector': {'index': 2, 'method': 'full_text', 'selector': 'b'},
+                   'name_selector': {'index': 0, 'method': 'full_text', 'selector': 'b'}},
     'five': {   'citation_selector': {'index': 3, 'method': 'full_text', 'selector': 'p'},
-                'content_selector': {'index': 4, 'method': 'full_text', 'selector': 'p'},
-                'genus_selector': {'index': 2, 'method': 'position_1', 'selector': 'b'},
-                'name_selector': {'index': 2, 'method': 'position_2', 'selector': 'b'}},
+                'content_selector': {'index': 1, 'method': 'full_text', 'selector': 'p[style*="text-align:justify"]'},
+                'genus_selector': {'index': 0, 'method': 'position_1', 'selector': 'b'},
+                'name_selector': {'index': 0, 'method': 'position_2', 'selector': 'b'}},
     'four': {   'content_selector': {'index': 0, 'method': 'full_text', 'selector': 'p[align="justify"]'},
-                'name_selector': {'index': 1, 'method': 'position_2', 'selector': 'b'}},
+                'name_selector': {'index': 1, 'method': 'full_text', 'selector': 'b'}},
     'fourteen': {   'citation_selector': {'index': 3, 'method': 'full_text', 'selector': 'p'},
                     'content_selector': {   'index': 0,
                                             'method': 'full_text',
                                             'selector': 'p[style*="text-align:justify"]'},
-                    'genus_selector': {'index': 3, 'method': 'position_1', 'selector': 'b'}},
-    'nine': {   'content_selector': {'index': 4, 'method': 'full_text', 'selector': 'p'}},
-    'seven': {   'content_selector': {'index': 5, 'method': 'full_text', 'selector': 'p'}},
+                    'genus_selector': {'index': 3, 'method': 'full_text', 'selector': 'b'}},
+    'nine': {'content_selector': {'index': 4, 'method': 'full_text', 'selector': 'p'}},
+    'seven': {'content_selector': {'index': 5, 'method': 'full_text', 'selector': 'p'}},
     'seventeen': {   'content_selector': {'index': 3, 'method': 'full_text', 'selector': 'p'},
-                     'name_selector': {'index': 2, 'method': 'first_lowercase', 'selector': 'b'}},
-    'ten': {   'content_selector': {'index': 4, 'method': 'full_text', 'selector': 'p'}},
-    'thirteen': {   'content_selector': {'index': 0, 'method': 'full_text', 'selector': 'p'}},
+                     'name_selector': {'index': 2, 'method': 'full_text', 'selector': 'b'}},
+    'ten': {'content_selector': {'index': 4, 'method': 'full_text', 'selector': 'p'}},
+    'thirteen': {'content_selector': {'index': 0, 'method': 'full_text', 'selector': 'p'}},
     'three': {   'content_selector': {'index': 5, 'method': 'full_text', 'selector': 'p'},
-                 'genus_selector': {'index': 2, 'method': 'position_1', 'selector': 'b'},
-                 'name_selector': {'index': 2, 'method': 'position_2', 'selector': 'b'}}}
+                 'name_selector': {'index': 2, 'method': 'full_text', 'selector': 'b'}}}
+
 
 KNOWN_TAXONOMIC_STATUSES = [
     'stat. rev.',

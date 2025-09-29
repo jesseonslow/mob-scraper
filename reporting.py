@@ -6,7 +6,7 @@ from pathlib import Path
 from html import escape
 from bs4 import BeautifulSoup
 
-from config import REPORT_DIR, MARKDOWN_DIR
+from config import REPORT_DIR, SPECIES_DIR
 from file_system import get_master_php_urls, index_entries_by_url
 
 INDEX_TEMPLATE = """
@@ -92,7 +92,7 @@ def update_index_page():
     # ... (This function remains exactly the same) ...
     print("Updating reports index page...")
     master_urls = get_master_php_urls()
-    existing_species = index_entries_by_url(MARKDOWN_DIR)
+    existing_species = index_entries_by_url(SPECIES_DIR)
     total_php_species = len(master_urls)
     total_markdown_species = len(existing_species)
     percentage_complete = (total_markdown_species / total_php_species * 100) if total_php_species > 0 else 0

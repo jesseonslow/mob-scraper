@@ -6,7 +6,7 @@ from pathlib import Path
 from bs4 import BeautifulSoup
 
 from config import (
-    MARKDOWN_DIR, PHP_ROOT_DIR, LEGACY_URL_BASE, GROUP_MAPPING,
+    SPECIES_DIR, PHP_ROOT_DIR, LEGACY_URL_BASE, GROUP_MAPPING,
     FIELDS_TO_DELETE, BOOK_NUMBER_MAP  # <-- Add BOOK_NUMBER_MAP
 )
 from file_system import save_markdown_file
@@ -129,7 +129,7 @@ def run_cleanup(images=False, groups=False, fields=False, citations=False):
     print("🚀 Starting cleanup process...")
     updated_files_count = 0
     
-    all_files = sorted(list(MARKDOWN_DIR.glob('**/*.md*')))
+    all_files = sorted(list(SPECIES_DIR.glob('**/*.md*')))
     total_files = len(all_files)
 
     for i, markdown_path in enumerate(all_files):

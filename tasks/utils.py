@@ -56,3 +56,28 @@ def get_book_from_url(url: str) -> str:
         book_num = '15-16' if part_str == '15-16' else part_str.split('-')[0]
         return config.BOOK_WORD_MAP.get(book_num, "Unknown")
     return "Unknown"
+
+def is_data_valid(scraped_data: dict):
+    """
+    Performs a comprehensive quality check and returns a list of failing fields.
+    """
+    failures = []
+    name = scraped_data.get("name")
+    genus = scraped_data.get("genus")
+    body = scraped_data.get("body_content", "")
+    author = scraped_data.get("author")
+
+    if (not name or name == "Unknown" or '\ufffd' in name or
+            name in config.KNOWN_TAXONOMIC_STATUSES or name == author):
+        failures.append('name')
+    
+    if not genus or genus == "Unknown" or genus in config.KNOWN_TAXONOMIC_STATUSES:
+        failures.append('genus')
+
+    if not author:
+        failures.append('author')
+
+    if len(body.strip()) < 50:
+        failures.append('content')
+
+    return failures

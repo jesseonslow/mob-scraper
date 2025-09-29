@@ -1,6 +1,9 @@
+# tasks/scrape_new.py
+
 import re
 import importlib
 import random
+import time
 from itertools import groupby
 import frontmatter
 from pathlib import Path
@@ -10,10 +13,10 @@ import config
 from config import BOOK_WORD_MAP
 from file_system import (
     get_master_php_urls, index_entries_by_url, index_entries_by_slug,
-    create_markdown_file  # Uses the centralized function
+    create_markdown_file
 )
 from scraper import SpeciesScraper
-from tasks.utils import get_contextual_data, get_book_from_url # Uses the centralized function
+from tasks.utils import get_contextual_data, get_book_from_url
 from tasks.interactive_cli import run_interactive_session
 from reclassification_manager import load_reclassified_urls
 
@@ -28,32 +31,37 @@ def _is_data_valid(scraped_data: dict):
     body = scraped_data.get("body_content", "")
     author = scraped_data.get("author")
 
+    # --- Name Validation ---
     if (not name or name == "Unknown" or '\ufffd' in name or
             name in config.KNOWN_TAXONOMIC_STATUSES or name == author):
         failures.append('name')
     
-    if not genus or genus == "Unknown":
+    # --- Genus Validation (Now with status check) ---
+    if not genus or genus == "Unknown" or genus in config.KNOWN_TAXONOMIC_STATUSES:
         failures.append('genus')
 
+    # --- Author Validation (Now checks for existence) ---
+    if not author:
+        failures.append('author')
+
+    # --- Content Validation ---
     if len(body.strip()) < 50:
         failures.append('content')
 
     return failures
 
-#
-# The local _create_file_from_data() function that was here has been DELETED.
-#
 
 def run_scrape_new(generate_files=False, interactive=False):
     """
     The main function for the 'scrape_new' task, with a more robust interactive workflow.
     """
+    random.seed(time.time())
     all_php_urls = get_master_php_urls()
     reclassified_urls = load_reclassified_urls()
     master_urls = all_php_urls - reclassified_urls
     print(f"Found {len(reclassified_urls)} URLs reclassified as genus pages. They will be excluded.")
 
-    existing_species = index_entries_by_url(config.MARKDOWN_DIR)
+    existing_species = index_entries_by_url(config.SPECIES_DIR)
     existing_genera_by_url = index_entries_by_url(config.GENERA_DIR)
     existing_genera_by_slug = index_entries_by_slug(config.GENERA_DIR)
     
@@ -73,11 +81,6 @@ def run_scrape_new(generate_files=False, interactive=False):
             creatable_entries.append({'url': url, 'neighbor_data': context_data, 'context_type': context_type})
         else:
             warnings.append(url)
-    
-    #
-    # The local get_book_from_url() function that was here has been DELETED.
-    # We now rely on the version imported from tasks.utils.
-    #
 
     books_to_skip = set()
     
@@ -153,11 +156,9 @@ def run_scrape_new(generate_files=False, interactive=False):
             failed_fields = _is_data_valid(scraped_data)
             
             if not failed_fields:
-                # Calls the correct, imported function
                 create_markdown_file(entry, scraped_data, book_name)
                 created_count += 1
             else:
-                    # --- NEW ENHANCED DEBUGGING OUTPUT ---
                     print(f"\n-> [ERROR] Skipping {Path(url).name}: Scraped data is invalid.")
                     print(f"   - Book: {book_name}")
                     print(f"   - Failed Fields: {', '.join(failed_fields)}")

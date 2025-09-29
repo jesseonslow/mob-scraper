@@ -138,6 +138,41 @@ def save_markdown_file(post: frontmatter.Post, filepath: Path):
         print(f"  -> ❌ ERROR: Could not save file {filepath.name}: {e}")
         return False
 
+def build_legacy_to_new_url_map():
+    """
+    Scans the entire content directory to build a mapping of old legacy URL paths
+    to their new, correct site paths (e.g., /species/slug).
+    This is a shared utility for redirects and link rewriting.
+    """
+    print("Building legacy-to-new URL map...")
+    url_map = {}
+    content_dir = config.CONTENT_DIR
+    
+    if not content_dir.is_dir():
+        print(f"  -> WARNING: Content directory not found at '{content_dir}'.")
+        return {}
+
+    all_files = list(content_dir.glob('**/*.md*'))
+    
+    for md_path in all_files:
+        if not md_path.is_file():
+            continue
+        try:
+            with open(md_path, 'r', encoding='utf-8-sig') as f:
+                post = frontmatter.load(f)
+            
+            legacy_url = post.metadata.get('legacy_url')
+            if legacy_url:
+                source_path = urlparse(legacy_url).path
+                subfolder = md_path.parent.name
+                destination_path = f"/{subfolder}/{md_path.stem}"
+                url_map[source_path] = destination_path
+        except Exception:
+            continue
+            
+    print(f"  -> Successfully mapped {len(url_map)} URLs.")
+    return url_map
+
 def create_markdown_file(entry_data: dict, scraped_data: dict, book_name: str):
     """
     Creates and saves a new markdown file for a species from scraped data.
@@ -161,7 +196,7 @@ def create_markdown_file(entry_data: dict, scraped_data: dict, book_name: str):
     name_for_slug = scraped_data.get('name', 'unknown').lower().replace('sp. ', 'sp-').replace(' ', '-').replace('?', '').replace('.', '')
     # Use the cleaned genus for the slug.
     slug = f"{clean_genus.replace(' ', '-')}-{name_for_slug}"
-    filepath = config.MARKDOWN_DIR / f"{slug}.md"
+    filepath = config.SPECIES_DIR / f"{slug}.md"
     
     if filepath.exists():
         print(f"  -> ℹ️ SKIPPING: File already exists at {filepath.name}")

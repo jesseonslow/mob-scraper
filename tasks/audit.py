@@ -2,7 +2,7 @@ import collections
 import frontmatter
 import re
 
-from config import MARKDOWN_DIR, GENERA_DIR, CONTENT_QUALITY_REPORT_FILENAME
+from config import SPECIES_DIR, GENERA_DIR, CONTENT_QUALITY_REPORT_FILENAME
 from file_system import get_master_php_urls, index_entries_by_url, index_entries_by_slug
 from reporting import generate_html_report, update_index_page
 from tasks.utils import get_contextual_data
@@ -17,7 +17,7 @@ def run_audit():
     # --- Part 1: Audit for Missing Files ---
     print("🔎 Checking for missing files...")
     master_urls = get_master_php_urls()
-    existing_species = index_entries_by_url(MARKDOWN_DIR)
+    existing_species = index_entries_by_url(SPECIES_DIR)
     existing_genera_by_url = index_entries_by_url(GENERA_DIR)
     existing_genera_by_slug = index_entries_by_slug(GENERA_DIR)
     
@@ -38,7 +38,7 @@ def run_audit():
     unfinished_files = []
     book_data = collections.defaultdict(lambda: collections.defaultdict(int))
 
-    for file_path in MARKDOWN_DIR.glob('**/*.md*'):
+    for file_path in SPECIES_DIR.glob('**/*.md*'):
         if not file_path.is_file(): continue
         try:
             with open(file_path, 'r', encoding='utf-8-sig') as f:
