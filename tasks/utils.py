@@ -1,4 +1,5 @@
 import re
+import config
 
 def get_contextual_data(missing_url, existing_species, existing_genera_by_url, existing_genera_by_slug):
     """
@@ -44,3 +45,14 @@ def get_contextual_data(missing_url, existing_species, existing_genera_by_url, e
             pass
     
     return None, None
+
+def get_book_from_url(url: str) -> str:
+    """Extracts the book name (e.g., 'seven') from a legacy URL."""
+    # This regex correctly uses a single backslash for the digit character class
+    match = re.search(r'/part-([\d-]+)/', url)
+    if match:
+        part_str = match.group(1)
+        # Handle cases like '15-16' vs '15'
+        book_num = '15-16' if part_str == '15-16' else part_str.split('-')[0]
+        return config.BOOK_WORD_MAP.get(book_num, "Unknown")
+    return "Unknown"

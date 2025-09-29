@@ -42,7 +42,7 @@ def format_body_content(markdown_text: str):
         processed_text = pattern.sub(replacer, processed_text)
     
     # Add line breaks after sentences ending with a period followed by a capital letter
-    processed_text = re.sub(r'([a-z]{2,})\.\s+(?=[A-Z])', r'\1.\n\n', processed_text)
+    processed_text = re.sub(r'([a-z]{2,})\.\s+(?=[A-Z])', r'\\1.\\n\\n', processed_text)
     # Clean up stray periods that are now at the start of a line
     processed_text = re.sub(r'\n\s*\.\s*', '\n', processed_text)
     # Consolidate multiple newlines into a maximum of two

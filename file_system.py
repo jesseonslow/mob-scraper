@@ -5,6 +5,7 @@ import re
 import ast
 import pprint
 from pathlib import Path
+import config
 from config import (
     PHP_ROOT_DIR, LEGACY_URL_BASE, CONFIG_PATH, RULES_VAR_NAME
 )
@@ -128,10 +129,67 @@ def save_markdown_file(post: frontmatter.Post, filepath: Path):
     """
     try:
         new_file_content = frontmatter.dumps(post)
+        filepath.parent.mkdir(parents=True, exist_ok=True) # Ensure directory exists
         with open(filepath, 'w', encoding='utf-8') as f:
             f.write(new_file_content)
-        print(f"  -> ✅ Saved changes to {filepath.name}")
+        print(f"  -> ✅ Saved: {filepath.name}")
         return True
     except Exception as e:
         print(f"  -> ❌ ERROR: Could not save file {filepath.name}: {e}")
         return False
+
+def create_markdown_file(entry_data: dict, scraped_data: dict, book_name: str):
+    """
+    Creates and saves a new markdown file for a species from scraped data.
+    """
+    url = entry_data['url']
+    neighbor_data = entry_data['neighbor_data']
+    
+    # --- GENUS CLEANING SOLUTION ---
+    # 1. Get the raw genus name.
+    raw_genus = scraped_data.get('genus')
+    
+    # 2. Clean it for use in the frontmatter and slug.
+    #    - Remove any leading/trailing whitespace.
+    #    - Convert to lowercase.
+    #    - Remove any character that is not a standard letter.
+    clean_genus = ""
+    if raw_genus:
+        clean_genus = re.sub(r'[^a-z]', '', raw_genus.strip().lower())
+
+    # --- SLUG CREATION ---
+    name_for_slug = scraped_data.get('name', 'unknown').lower().replace('sp. ', 'sp-').replace(' ', '-').replace('?', '').replace('.', '')
+    # Use the cleaned genus for the slug.
+    slug = f"{clean_genus.replace(' ', '-')}-{name_for_slug}"
+    filepath = config.MARKDOWN_DIR / f"{slug}.md"
+    
+    if filepath.exists():
+        print(f"  -> ℹ️ SKIPPING: File already exists at {filepath.name}")
+        return
+
+    # --- FRONTMATTER CREATION ---
+    new_metadata = {
+        'name': scraped_data.get('name'),
+        'author': scraped_data.get('author'),
+        'legacy_url': url,
+        'book': book_name,
+        'family': neighbor_data.get('family'),
+        'subfamily': neighbor_data.get('subfamily'),
+        'tribe': neighbor_data.get('tribe'),
+        'genus': clean_genus,
+        'group': neighbor_data.get('group'),
+        'taxonomic_status': scraped_data.get('taxonomic_status', []),
+        'plates': scraped_data.get('plates', []),
+        'genitalia': scraped_data.get('genitalia', []),
+        'misc_images': scraped_data.get('misc_images', []),
+        'citations': []
+    }
+    
+    post = frontmatter.Post(content=scraped_data.get('body_content', ''))
+    
+    # --- PLATES SAVING SOLUTION ---
+    # Change the filter from 'if v' to 'if v is not None'.
+    # This will correctly save fields with empty lists (`[]`) as their value.
+    post.metadata = {k: v for k, v in new_metadata.items() if v is not None}
+    
+    save_markdown_file(post, filepath)
