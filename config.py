@@ -18,6 +18,7 @@ AUDIT_REPORT_FILENAME = "audit_report.html"
 CONTENT_QUALITY_REPORT_FILENAME = "content_quality_report.html"
 IMAGE_UPDATE_REPORT_FILENAME = "image_update_report.html"
 REDIRECT_REPORT_FILENAME = "redirects.csv"
+CITATION_HEALTH_REPORT_FILENAME = "citation_health_report.html"
 
 # --- URLS & DEFAULTS ---
 # Base URLs for constructing links and a default image for species without one.

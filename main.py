@@ -5,6 +5,7 @@ from tasks.scrape_new import run_scrape_new
 from tasks.cleanup import run_cleanup
 from tasks.audit import run_audit
 from tasks.generate_redirects import run_generate_redirects
+from tasks.citation_audit import run_citation_audit
 
 def main():
     """
@@ -15,7 +16,6 @@ def main():
     )
     subparsers = parser.add_subparsers(dest="command", required=True, help="Available commands")
 
-    # --- Parser for the "scrape" command ---
     scrape_parser = subparsers.add_parser(
         "scrape",
         help="Find and scrape new species entries that are missing."
@@ -37,12 +37,20 @@ def main():
     )
     scrape_parser.set_defaults(handler=run_scrape_new)
 
-    # (rest of the parsers are unchanged)
+    audit_parser = subparsers.add_parser(
+        "audit",
+        help="Run a comprehensive audit on content files and generate a report."
+    )
+    audit_parser.set_defaults(handler=run_audit)
+
+    citation_audit_parser = subparsers.add_parser(
+        "citation-audit",
+        help="Generate a report on the health of citations in all species files."
+    )
+    citation_audit_parser.set_defaults(handler=run_citation_audit)
 
     args = parser.parse_args()
     
-    # --- THIS IS THE FIX ---
-    # If --force is used, it should always imply that we are generating files.
     if hasattr(args, 'force') and args.force:
         args.generate_files = True
 

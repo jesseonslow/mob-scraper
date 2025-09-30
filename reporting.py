@@ -6,7 +6,7 @@ from pathlib import Path
 from html import escape
 from bs4 import BeautifulSoup
 
-from config import REPORT_DIR, SPECIES_DIR
+from config import REPORT_DIR, SPECIES_DIR, CITATION_HEALTH_REPORT_FILENAME
 from file_system import get_master_php_urls, index_entries_by_url
 
 INDEX_TEMPLATE = """
@@ -28,6 +28,11 @@ INDEX_TEMPLATE = """
     .report-summary {{ padding: 1.5em; }}
     .report-summary ul {{ margin: 0; padding-left: 1.2em; }}
     .report-summary li {{ margin-bottom: 0.5em; }}
+    .citation-health-grid {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1em; }}
+    .citation-stat {{ background: #f9f9f9; padding: 1em; border-radius: 5px; text-align: center; }}
+    .citation-stat h3 {{ margin: 0 0 0.5em; font-size: 1.1em; color: #333; }}
+    .citation-stat .value {{ font-size: 2em; font-weight: bold; color: #005a9c; }}
+    .citation-stat .percentage {{ font-size: 0.9em; color: #555; }}
 </style></head><body>
 <div class="container">
     <h1>📊 Scraper Reports Index</h1>
@@ -36,6 +41,7 @@ INDEX_TEMPLATE = """
         <div class="progress-bar"><div class="progress-bar-inner" style="width: {percentage_complete:.2f}%;">{percentage_complete:.2f}%</div></div>
         <p class="stats-label">Completed: <strong>{total_markdown_species}</strong> of <strong>{total_php_species}</strong> species files.</p>
     </div>
+    {citation_summary_html}
     {report_list_html}
 </div></body></html>
 """
@@ -60,14 +66,11 @@ HTML_TEMPLATE = """
 def generate_html_report(report_title: str, summary_items: dict, sections: list, output_filename: str):
     REPORT_DIR.mkdir(parents=True, exist_ok=True)
     
-    # --- MODIFIED SECTION ---
     summary_html = "<h2>Summary</h2><ul>"
     for key, value in summary_items.items():
-        # Add a style attribute if the key indicates an action is required
-        style = ' style="color: #c0392b;"' if "Action Required" in key else ""
+        style = ' style="color: #c0392b;"' if "Action Required" in key or "Badly" in key else ""
         summary_html += f'<li class="summary-item"{style}>{key}: <strong>{value}</strong></li>'
     summary_html += "</ul>"
-    # --- END MODIFIED SECTION ---
     
     sections_html = ""
     for section in sections:
@@ -89,7 +92,6 @@ def generate_html_report(report_title: str, summary_items: dict, sections: list,
 
 
 def update_index_page():
-    # ... (This function remains exactly the same) ...
     print("Updating reports index page...")
     master_urls = get_master_php_urls()
     existing_species = index_entries_by_url(SPECIES_DIR)
@@ -99,6 +101,52 @@ def update_index_page():
     reports = []
     if not REPORT_DIR.is_dir():
         return
+
+    # --- NEW: Citation health summary logic ---
+    citation_summary_html = ""
+    citation_report_path = REPORT_DIR / CITATION_HEALTH_REPORT_FILENAME
+    if citation_report_path.exists():
+        with open(citation_report_path, 'r', encoding='utf-8') as f:
+            soup = BeautifulSoup(f.read(), 'html.parser')
+        
+        summary_list_items = soup.select('.summary-item')
+        stats = {li.contents[0].strip().replace(':', ''): int(li.find('strong').text) for li in summary_list_items}
+        
+        total = stats.get("Total Files Scanned", 0)
+        if total > 0:
+            correct = stats.get("Correctly Formatted", 0)
+            empty = stats.get("Empty", 0)
+            no_markdown = stats.get("No Markdown", 0)
+            badly_formatted = stats.get("Badly Formatted", 0)
+
+            citation_summary_html = f"""
+            <div class="summary-stats">
+                <h2>Citation Health</h2>
+                <div class="citation-health-grid">
+                    <div class="citation-stat">
+                        <h3>Correct</h3>
+                        <div class="value">{correct}</div>
+                        <div class="percentage">{(correct / total * 100):.1f}%</div>
+                    </div>
+                    <div class="citation-stat">
+                        <h3>Empty</h3>
+                        <div class="value">{empty}</div>
+                        <div class="percentage">{(empty / total * 100):.1f}%</div>
+                    </div>
+                    <div class="citation-stat">
+                        <h3>No Markdown</h3>
+                        <div class="value">{no_markdown}</div>
+                        <div class="percentage">{(no_markdown / total * 100):.1f}%</div>
+                    </div>
+                    <div class="citation-stat">
+                        <h3>Bad Format</h3>
+                        <div class="value">{badly_formatted}</div>
+                        <div class="percentage">{(badly_formatted / total * 100):.1f}%</div>
+                    </div>
+                </div>
+            </div>
+            """
+    # --- END NEW SECTION ---
 
     for report_file in REPORT_DIR.glob("*.html"):
         if report_file.name == "index.html":
@@ -156,7 +204,8 @@ def update_index_page():
         report_list_html=report_list_html,
         total_php_species=total_php_species,
         total_markdown_species=total_markdown_species,
-        percentage_complete=percentage_complete
+        percentage_complete=percentage_complete,
+        citation_summary_html=citation_summary_html # <-- NEW
     )
     index_path = REPORT_DIR / "index.html"
     with open(index_path, 'w', encoding='utf-8') as f:

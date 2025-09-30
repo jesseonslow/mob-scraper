@@ -54,6 +54,7 @@ def run_audit():
             elif not clean_content.endswith('.'):
                 unfinished_files.append(file_path.name)
                 book_data[book]['unfinished'] += 1
+                
         except Exception as e:
             print(f"  [ERROR] Could not process {file_path.name}: {e}")
 
