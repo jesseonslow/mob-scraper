@@ -64,7 +64,7 @@ def main():
                 fields=args.fields,
                 citations=args.citations
             )
-        elif args.command in ['audit', 'redirects']:
+        elif args.command in ['audit', 'redirects', 'citation-audit']:
             args.handler()
     else:
         parser.print_help()
