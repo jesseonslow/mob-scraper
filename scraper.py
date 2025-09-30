@@ -43,11 +43,18 @@ def scrape_images_and_labels(soup: BeautifulSoup, book_name: str, book_number: s
         text = element.get_text()
         if re.search(r'(♂|♀|\(holotype\)|\(paratype\))', text, re.IGNORECASE):
             label_parts = []
-            if symbol_match := re.search(r'(♂|♀)', text):
-                label_parts.append(symbol_match.group(0))
-            if type_match := re.search(r'(\(holotype\)|\(paratype\))', text, re.IGNORECASE):
-                label_parts.append(type_match.group(0).lower())
-            label_strings.append(' '.join(label_parts))
+            symbols = re.findall(r'(♂|♀)', text)
+            types = re.findall(r'(\(holotype\)|\(paratype\))', text, re.IGNORECASE)
+            
+            max_len = max(len(symbols), len(types))
+            for i in range(max_len):
+                parts = []
+                if i < len(symbols):
+                    parts.append(symbols[i])
+                if i < len(types):
+                    parts.append(types[i].lower())
+                if parts:
+                    label_strings.append(' '.join(parts))
 
     label_map = {tag.get('src'): label_strings[i] for i, tag in enumerate(plate_tags) if i < len(label_strings)}
     
@@ -74,7 +81,10 @@ class SpeciesScraper:
         self.book_name = book_name
         self.book_number = BOOK_NUMBER_MAP.get(book_name)
         self.genus_fallback = genus_name
+                # 1. Get the appropriate set of rules for the book.
         self.rules = BOOK_SCRAPING_RULES.get(book_name, BOOK_SCRAPING_RULES.get('default', {}))
+        # 2. Add the book's name to the rules dictionary so the parser can identify it.
+        self.rules['book_name'] = book_name
     
     def scrape_all(self):
         """

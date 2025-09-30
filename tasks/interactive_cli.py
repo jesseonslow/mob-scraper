@@ -88,13 +88,14 @@ def _get_user_choice(data_type, suggestions, soup):
         if method_choice == '1':
             return chosen_rule, 'full_text'
         elif method_choice == '2':
-            try:
-                pos = int(input("Enter position (e.g., 1 for first, 2 for second, --1 for last): "))
-                return chosen_rule, f'position_{pos}'
-            except ValueError:
-                print("Invalid number. Please enter an integer.")
-        # --- THIS IS THE FIX ---
-        # Handle the new choice
+            while True:
+                try:
+                    # The typo in the prompt has also been corrected.
+                    pos_input = input("Enter position (e.g., 1 for first, 2 for second, -1 for last): ")
+                    pos = int(pos_input)
+                    return chosen_rule, f'position_{pos}'
+                except ValueError:
+                    print("Invalid number. Please enter an integer.")
         elif data_type == 'citation' and method_choice == '3':
             return chosen_rule, 'build_citation_string'
         elif method_choice == 'p':

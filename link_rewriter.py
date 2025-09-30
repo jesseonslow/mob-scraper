@@ -19,21 +19,22 @@ def rewrite_legacy_links(markdown_text: str):
     with their new, correct paths using the generated URL map.
     """
     url_map = get_url_map()
-    if not url_map:
-        return markdown_text
+    if not url_map: return markdown_text
 
     link_pattern = re.compile(r'\[([^\]]+)\]\(([^)]+)\)')
 
     def replacer(match):
-        link_text = match.group(1)
-        url = match.group(2)
+        link_text, url = match.groups()
         
-        parsed_url = urlparse(url)
-        if parsed_url.path in url_map:
-            new_path = url_map[parsed_url.path]
-            print(f"  -> Rewriting link: {parsed_url.path} -> {new_path}")
-            return f'[{link_text}]({new_path})'
-        else:
-            return match.group(0)
+        # --- FIX: Handle relative links by checking if the URL is at the end of a legacy path ---
+        for legacy_path, new_path in url_map.items():
+            if legacy_path.endswith(url):
+                # Make the new path relative, e.g., ./slug
+                relative_new_path = f".{new_path.replace('/species', '')}"
+                print(f"  -> Rewriting link: {url} -> {relative_new_path}")
+                return f'[{link_text}]({relative_new_path})'
+        
+        # If no match was found, return the original link
+        return match.group(0)
 
     return link_pattern.sub(replacer, markdown_text)

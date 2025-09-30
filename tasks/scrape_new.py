@@ -1,5 +1,3 @@
-# tasks/scrape_new.py
-
 import re
 import importlib
 import random
@@ -10,7 +8,6 @@ from pathlib import Path
 from bs4 import BeautifulSoup
 
 import config
-from config import BOOK_WORD_MAP
 from file_system import (
     get_master_php_urls, index_entries_by_url, index_entries_by_slug,
     create_markdown_file
@@ -20,7 +17,7 @@ from tasks.utils import get_contextual_data, get_book_from_url, is_data_valid
 from tasks.interactive_cli import run_interactive_session
 from reclassification_manager import load_reclassified_urls
 
-def run_scrape_new(generate_files=False, interactive=False):
+def run_scrape_new(generate_files=False, interactive=False, force=False):
     """
     The main function for the 'scrape_new' task, with a more robust interactive workflow.
     """
@@ -43,29 +40,38 @@ def run_scrape_new(generate_files=False, interactive=False):
     print(f"\nFound {len(missing_urls)} missing entries. Analyzing for context...")
     
     creatable_entries = []
-    warnings = [] 
+    uncreatable_entries = [] 
     for url in missing_urls:
         context_data, context_type = get_contextual_data(url, existing_species, existing_genera_by_url, existing_genera_by_slug)
         if context_data:
             creatable_entries.append({'url': url, 'neighbor_data': context_data, 'context_type': context_type})
         else:
-            warnings.append(url)
+            uncreatable_entries.append(url)
 
     books_to_skip = set()
     
     if interactive:
         print("\n--- Interactive Mode: Checking for missing or invalid rules ---")
         
-        # Group entries by book for processing
         keyfunc = lambda x: get_book_from_url(x['url'])
         sorted_entries = sorted(creatable_entries, key=keyfunc)
         entries_by_book = {k: list(v) for k, v in groupby(sorted_entries, key=keyfunc)}
         
-        for book_name, entries_for_book in entries_by_book.items():
-            if book_name in books_to_skip or book_name == "Unknown":
+        all_books_to_check = [book for book in entries_by_book.keys() if book != "Unknown" and book not in config.BOOKS_TO_SKIP_INTERACTIVE]
+        num_books_to_sample = min(len(all_books_to_check), 5)
+        
+        if num_books_to_sample > 0:
+            sampled_book_names = random.sample(all_books_to_check, num_books_to_sample)
+            print(f"\nFound {len(all_books_to_check)} books with missing entries. Randomly sampling {len(sampled_book_names)} of them for verification.")
+        else:
+            sampled_book_names = []
+            print("\nNo books with missing entries to check in interactive mode.")
+
+        for book_name in sampled_book_names:
+            if book_name in books_to_skip:
                 continue
 
-            entry_to_test = random.choice(entries_for_book)
+            entry_to_test = random.choice(entries_by_book[book_name])
             url_to_test = entry_to_test['url']
             context_genus = entry_to_test['neighbor_data'].get('genus') if entry_to_test['context_type'] == 'species' else entry_to_test['neighbor_data'].get('name')
 
@@ -100,8 +106,13 @@ def run_scrape_new(generate_files=False, interactive=False):
         print("\n--- Interactive session complete. ---")
     
     if generate_files:
-        print(f"\n--- Live Run: Generating files... ---")
+        if force:
+            print("\n--- Live Run (FORCE MODE): Generating all creatable files, ignoring validation... ---")
+        else:
+            print(f"\n--- Live Run: Generating files... ---")
+        
         created_count = 0
+        skipped_count = 0
         for entry in creatable_entries:
             url = entry['url']
             book_name = get_book_from_url(url)
@@ -119,30 +130,31 @@ def run_scrape_new(generate_files=False, interactive=False):
                 html_content = f.read()
             
             context_genus = entry['neighbor_data'].get('genus') if entry['context_type'] == 'species' else entry['neighbor_data'].get('name')
-            
-            # 2. Pass the raw HTML string (not the soup object) to the scraper.
             scraper = SpeciesScraper(html_content, book_name, context_genus)
             scraped_data = scraper.scrape_all()
             
-            failed_fields = is_data_valid(scraped_data)
-            
-            if not failed_fields:
-                create_markdown_file(entry, scraped_data, book_name)
-                created_count += 1
+            if force:
+                if create_markdown_file(entry, scraped_data, book_name):
+                    created_count += 1
             else:
-                print(f"\n-> [ERROR] Skipping {Path(url).name}: Scraped data is invalid.")
-                print(f"   - Book: {book_name}")
-                print(f"   - Failed Fields: {', '.join(failed_fields)}")
-                print("   --- Scraped Data ---")
-                print(f"   Name:     '{scraped_data.get('name')}'")
-                print(f"   Genus:    '{scraped_data.get('genus')}'")
-                print(f"   Author:   '{scraped_data.get('author')}'")
-                content_snippet = scraped_data.get('body_content', '').strip().replace('\n', ' ')
-                print(f"   Content:  '{content_snippet[:100]}...'")
-                print("   --------------------")
-        print(f"\n✨ Live run complete. Generated {created_count} file(s).")
+                failed_fields = is_data_valid(scraped_data)
+                if not failed_fields:
+                    if create_markdown_file(entry, scraped_data, book_name):
+                        created_count += 1
+                else:
+                    skipped_count += 1
+                    print(f"\n-> [SKIPPED] {Path(url).name}: Scraped data is invalid.")
+                    print(f"   - Failed Fields: {', '.join(failed_fields)}")
+
+        remaining_count = len(missing_urls) - created_count
+        final_message = f"\n✨ Live run complete. Generated {created_count} file(s)."
+        if skipped_count > 0:
+            final_message += f" Skipped {skipped_count} file(s) due to validation errors."
+        if remaining_count > 0:
+            final_message += f" {remaining_count} missing files remain."
+        print(final_message)
     
     if not generate_files and not interactive:
         print("\n--- Dry Run Summary ---")
         print(f"✅ Found {len(creatable_entries)} entries that can be generated.")
-        print(f"⚠️ Found {len(warnings)} entries that are missing context.")
+        print(f"⚠️ Found {len(uncreatable_entries)} entries that are missing context.")

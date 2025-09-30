@@ -2,7 +2,8 @@ import re
 import string
 from bs4 import BeautifulSoup
 from markdownify import markdownify
-from processing import format_body_content, correct_text_spacing
+from soupsieve.util import SelectorSyntaxError
+from processing import format_body_content, correct_text_spacing, replace_ocr_symbols
 from config import KNOWN_TAXONOMIC_STATUSES
 from citation_scraper import scrape_and_format_citation
 
@@ -50,13 +51,12 @@ def _get_text_from_rule(soup: BeautifulSoup, rule: dict) -> str:
     
     try:
         elements = soup.select(selector)
-        if index >= len(elements) or index < -len(elements):
+        if not elements or abs(index) >= len(elements):
             return ""
         element = elements[index]
-        raw_text = element.get_text(strip=True, separator=' ')
-        clean_text = raw_text.replace('\ufffd', '')
-        return " ".join(clean_text.split())
-    except IndexError:
+        raw_text = element.text
+        return " ".join(raw_text.split())
+    except (SelectorSyntaxError, IndexError):
         return ""
 
 
@@ -80,22 +80,39 @@ def parse_html_with_rules(soup: BeautifulSoup, rules: dict, genus_fallback: str)
 
     name_method = name_rule.get('method', 'full_text')
     
-    # Use specific methods if they exist
     name = _apply_method(full_name_text, name_method)
     scraped_genus = _apply_method(full_genus_text, genus_rule.get('method', 'full_text'))
     author = _apply_method(full_author_text, author_rule.get('method', 'full_text'))
 
     is_complex_string = len(full_name_text.split()) > 1
     
-    # If using the 'full_text' heuristic, refine the extracted values
-    if name_method == 'full_text' and not author_rule:
+    if name_method == 'full_text' and not author_rule and is_complex_string:
         temp_text = full_name_text
-        for status in taxonomic_status:
-            temp_text = re.sub(re.escape(status), '', temp_text, flags=re.IGNORECASE)
+        
+        for status in KNOWN_TAXONOMIC_STATUSES:
+            if status in temp_text.lower():
+                if status not in taxonomic_status:
+                    taxonomic_status.append(status)
+                temp_text = re.sub(re.escape(status), '', temp_text, flags=re.IGNORECASE)
 
         tokens = temp_text.strip().split()
         found_author = None
-        if tokens:
+        try:
+            if '&' in tokens:
+                amp_index = tokens.index('&')
+                # Check if there are capitalized words on both sides
+                if amp_index > 0 and amp_index < len(tokens) - 1:
+                    author1 = tokens[amp_index - 1]
+                    author2 = tokens[amp_index + 1]
+                    if author1.istitle() and author2.istitle():
+                        found_author = f"{author1} & {author2}"
+                        # Remove the full author string for further processing
+                        temp_text = temp_text.replace(found_author, '').strip()
+        except ValueError:
+            pass # '&' not in tokens
+
+        # Fallback to single author detection if multi-author not found
+        if not found_author:
             last_word = tokens[-1].strip(string.punctuation)
             if (last_word.istitle() or last_word.isupper()) and len(last_word) > 1:
                 found_author = last_word
@@ -103,51 +120,73 @@ def parse_html_with_rules(soup: BeautifulSoup, rules: dict, genus_fallback: str)
         
         remaining_tokens = temp_text.strip().split()
         if len(remaining_tokens) == 1:
-            # Case 1: Only a single word remains (e.g., "sp.")
             name = remaining_tokens[0]
         elif len(remaining_tokens) > 1:
-            # Case 2: Multiple words remain (e.g., "Genus species")
             scraped_genus = remaining_tokens[0]
             name = ' '.join(remaining_tokens[1:])
         if found_author:
             author = found_author
-            
-    # --- Step 4 (THE FIX): Apply the "sp. n." override at the end ---
-    if "sp. n." in [s.lower() for s in taxonomic_status]:
-        author = "Holloway"
+
+    final_genus = scraped_genus or genus_fallback
+
+    if author:
+        author_string = author
+        for status in KNOWN_TAXONOMIC_STATUSES:
+            if status in author_string.lower():
+                if status not in taxonomic_status:
+                    taxonomic_status.append(status)
+                author_string = re.sub(re.escape(status), '', author_string, flags=re.IGNORECASE)
+        author = author_string.strip()
+    
+    # --- THIS IS THE FIX ---
+    # The "Holloway" overrides are now inside a safeguard to prevent them
+    # from overwriting an author that has already been found.
+    if not author:
+        if "sp. n." in [s.lower() for s in taxonomic_status] or "nom. nov." in [s.lower() for s in taxonomic_status]:
+            author = "Holloway"
+        if name == 'sp.':
+            author = 'Holloway'
+        if name and name.startswith('sp. ') and name.split(' ')[-1].isdigit():
+            author = 'Holloway'
 
     if name and name.strip().lower() == 'sp':
         name = 'sp.'
-
-    if name == 'sp.':
-        author = 'Holloway'
     
-    final_genus = scraped_genus or genus_fallback
+    if name:
+        name = name.replace('\ufffd', '').strip('\'" ')
+    if final_genus:
+        final_genus = final_genus.replace('\ufffd', '').strip('\'" ')
+    if author:
+        author = author.replace('\ufffd', '').strip('\'" ., ')
 
-    # --- Step 5: Process content and citations ---
     content_rule = rules.get('content_selector', {})
     body_content = ""
-    selector = content_rule.get('selector')
-    
-    if selector:
-        elements = soup.select(selector)
-        if elements:
+    if content_rule:
+        selector = content_rule.get('selector')
+        if selector:
             try:
-                index = content_rule.get('index', 0)
-                container = elements[index]
-                body_content = format_body_content(markdownify(str(container)))
-            except IndexError:
+                elements = soup.select(selector)
+                if elements:
+                    if rules.get('book_name') == 'thirteen':
+                         html_content = "".join(str(p) for p in elements)
+                         body_content = format_body_content(markdownify(html_content))
+                    else:
+                        index = content_rule.get('index', 0)
+                        container = elements[index]
+                        body_content = format_body_content(markdownify(str(container)))
+            except (SelectorSyntaxError, IndexError):
                 body_content = ""
+
+    if rules.get('book_name') == 'thirteen':
+        body_content = replace_ocr_symbols(body_content)
     
     citation_rule = rules.get('citation_selector', {})
     citations = []
     if citation_rule:
         citation_text = None
         if citation_rule.get('method') == 'build_citation_string':
-            # Use the new specialized scraper for complex cases
             citation_text = scrape_and_format_citation(soup, citation_rule)
         else:
-            # Use the standard text extraction for simple cases
             citation_text = _get_text_from_rule(soup, citation_rule)
         
         if citation_text:
