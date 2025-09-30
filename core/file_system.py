@@ -24,7 +24,8 @@ def get_master_php_urls():
             continue
             
         relative_path = php_path.relative_to(PHP_ROOT_DIR)
-        url = f"{LEGACY_URL_BASE}{relative_path.as_posix()}"
+        # --- FIX: Normalize URL to lowercase ---
+        url = f"{LEGACY_URL_BASE}{relative_path.as_posix()}".lower()
         master_urls.add(url)
         
     print(f"Found {len(master_urls)} potential species pages in source files.")
@@ -42,8 +43,10 @@ def index_entries_by_url(directory: Path):
         try:
             with open(md_path, 'r', encoding='utf-8-sig') as f:
                 post = frontmatter.load(f)
-            if post.metadata.get('legacy_url'):
-                url_map[post.metadata['legacy_url']] = post.metadata
+            legacy_url = post.metadata.get('legacy_url')
+            if legacy_url:
+                # --- FIX: Normalize URL to lowercase ---
+                url_map[legacy_url.lower()] = post.metadata
         except Exception:
             continue
     print(f"Indexed {len(url_map)} entries by legacy_url.")
@@ -126,7 +129,8 @@ def build_legacy_to_new_url_map():
             
             legacy_url = post.metadata.get('legacy_url')
             if legacy_url:
-                source_path = urlparse(legacy_url).path
+                # --- FIX: Normalize URL path to lowercase for matching ---
+                source_path = urlparse(legacy_url.lower()).path
                 subfolder = md_path.parent.name
                 destination_path = f"/{subfolder}/{md_path.stem}"
                 url_map[source_path] = destination_path
@@ -143,21 +147,13 @@ def create_markdown_file(entry_data: dict, scraped_data: dict, book_name: str):
     url = entry_data['url']
     neighbor_data = entry_data['neighbor_data']
     
-    # --- GENUS CLEANING SOLUTION ---
-    # 1. Get the raw genus name.
     raw_genus = scraped_data.get('genus')
     
-    # 2. Clean it for use in the frontmatter and slug.
-    #    - Remove any leading/trailing whitespace.
-    #    - Convert to lowercase.
-    #    - Remove any character that is not a standard letter.
     clean_genus = ""
     if raw_genus:
         clean_genus = re.sub(r'[^a-z]', '', raw_genus.strip().lower())
 
-    # --- SLUG CREATION ---
     name_for_slug = scraped_data.get('name', 'unknown').lower().replace('sp. ', 'sp-').replace(' ', '-').replace('?', '').replace('.', '')
-    # Use the cleaned genus for the slug.
     slug = f"{clean_genus.replace(' ', '-')}-{name_for_slug}"
     filepath = config.SPECIES_DIR / f"{slug}.md"
     
@@ -165,7 +161,6 @@ def create_markdown_file(entry_data: dict, scraped_data: dict, book_name: str):
         print(f"  -> ℹ️ SKIPPING: File already exists at {filepath.name}")
         return
 
-    # --- FRONTMATTER CREATION ---
     new_metadata = {
         'name': scraped_data.get('name'),
         'author': scraped_data.get('author'),
@@ -185,9 +180,6 @@ def create_markdown_file(entry_data: dict, scraped_data: dict, book_name: str):
     
     post = frontmatter.Post(content=scraped_data.get('body_content', ''))
     
-    # --- PLATES SAVING SOLUTION ---
-    # Change the filter from 'if v' to 'if v is not None'.
-    # This will correctly save fields with empty lists (`[]`) as their value.
     post.metadata = {k: v for k, v in new_metadata.items() if v is not None}
     
     save_markdown_file(post, filepath)

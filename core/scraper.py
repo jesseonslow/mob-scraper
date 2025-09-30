@@ -82,7 +82,7 @@ class SpeciesScraper:
         self.book_number = BOOK_NUMBER_MAP.get(book_name)
         self.genus_fallback = genus_name
                 # 1. Get the appropriate set of rules for the book.
-        self.rules = BOOK_SCRAPING_RULES.get(book_name, BOOK_SCRAPING_RULES.get('default', {}))
+        self.rules = SCRAPING_RULES.get(book_name, SCRAPING_RULES.get('default', {}))
         # 2. Add the book's name to the rules dictionary so the parser can identify it.
         self.rules['book_name'] = book_name
     

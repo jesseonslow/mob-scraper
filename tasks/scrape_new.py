@@ -76,7 +76,7 @@ def run_scrape_new(generate_files=False, interactive=False, force=False):
             url_to_test = entry_to_test['url']
             context_genus = entry_to_test['neighbor_data'].get('genus') if entry_to_test['context_type'] == 'species' else entry_to_test['neighbor_data'].get('name')
 
-            if book_name not in config.BOOK_SCRAPING_RULES:
+            if book_name not in config.SCRAPING_RULES:
                 print(f"\n[!] No rules found for book: '{book_name}'.")
                 status = run_interactive_session(entry_to_test, existing_rules=None, failed_fields=None)
                 if status == 'skip_book': books_to_skip.add(book_name)
@@ -95,7 +95,7 @@ def run_scrape_new(generate_files=False, interactive=False, force=False):
 
             if failed_fields:
                 print(f"  -> [!] Low confidence for {Path(url_to_test).name}. Failing fields: {failed_fields}")
-                existing_rules = config.BOOK_SCRAPING_RULES.get(book_name, {})
+                existing_rules = config.SCRAPING_RULES.get(book_name, {})
                 status = run_interactive_session(
                     entry_to_test, existing_rules=existing_rules, failed_fields=failed_fields
                 )
@@ -119,7 +119,7 @@ def run_scrape_new(generate_files=False, interactive=False, force=False):
             book_name = get_book_from_url(url)
             if book_name in books_to_skip: continue
             
-            if book_name not in config.BOOK_SCRAPING_RULES:
+            if book_name not in config.SCRAPING_RULES:
                 print(f"  -> SKIPPING {Path(url).name}: No rules defined for book '{book_name}'.")
                 continue
 

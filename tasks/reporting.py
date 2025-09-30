@@ -1,5 +1,3 @@
-# mob-scraper/reporting.py
-
 import re
 from datetime import datetime
 from pathlib import Path
@@ -8,6 +6,7 @@ from bs4 import BeautifulSoup
 
 from config import REPORT_DIR, SPECIES_DIR, CITATION_HEALTH_REPORT_FILENAME
 from core.file_system import get_master_php_urls, index_entries_by_url
+from reclassification_manager import load_reclassified_urls
 
 INDEX_TEMPLATE = """
 <!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>Scraper Reports Index</title>
@@ -16,9 +15,6 @@ INDEX_TEMPLATE = """
     .container {{ max-width: 900px; margin: 2em auto; padding: 0 1em; }}
     h1 {{ color: #333; border-bottom: 2px solid #eee; padding-bottom: 0.5em; }}
     .summary-stats {{ background: #fff; border: 1px solid #ddd; padding: 1.5em; margin-bottom: 2em; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }}
-    .progress-bar {{ background-color: #e9ecef; border-radius: .25rem; height: 2rem; display: flex; overflow: hidden; font-size: .75rem; }}
-    .progress-bar-inner {{ background-color: #28a745; display: flex; flex-direction: column; justify-content: center; color: #fff; text-align: center; white-space: nowrap; transition: width .6s ease; font-weight: bold; font-size: 1rem; }}
-    .stats-label {{ margin-top: 0.5rem; text-align: right; color: #555; font-size: 0.9em; }}
     .report-item {{ background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 2em; overflow: hidden; }}
     .report-header {{ background-color: #f7f7f7; padding: 1em 1.5em; border-bottom: 1px solid #eee; }}
     .report-header h2 {{ margin: 0; font-size: 1.5em; }}
@@ -28,19 +24,16 @@ INDEX_TEMPLATE = """
     .report-summary {{ padding: 1.5em; }}
     .report-summary ul {{ margin: 0; padding-left: 1.2em; }}
     .report-summary li {{ margin-bottom: 0.5em; }}
-    .citation-health-grid {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1em; }}
-    .citation-stat {{ background: #f9f9f9; padding: 1em; border-radius: 5px; text-align: center; }}
-    .citation-stat h3 {{ margin: 0 0 0.5em; font-size: 1.1em; color: #333; }}
-    .citation-stat .value {{ font-size: 2em; font-weight: bold; color: #005a9c; }}
-    .citation-stat .percentage {{ font-size: 0.9em; color: #555; }}
+    .health-grid {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1em; }}
+    .stat-card {{ background: #f9f9f9; padding: 1em; border-radius: 5px; text-align: center; }}
+    .stat-card h3 {{ margin: 0 0 0.5em; font-size: 1.1em; color: #333; }}
+    .stat-card .value {{ font-size: 2em; font-weight: bold; color: #005a9c; }}
+    .stat-card .percentage, .stat-card .description {{ font-size: 0.9em; color: #555; }}
+    .stat-card.critical .value {{ color: #c0392b; }}
 </style></head><body>
 <div class="container">
     <h1>📊 Scraper Reports Index</h1>
-    <div class="summary-stats">
-        <h2>Migration Progress</h2>
-        <div class="progress-bar"><div class="progress-bar-inner" style="width: {percentage_complete:.2f}%;">{percentage_complete:.2f}%</div></div>
-        <p class="stats-label">Completed: <strong>{total_markdown_species}</strong> of <strong>{total_php_species}</strong> species files.</p>
-    </div>
+    {data_integrity_html}
     {citation_summary_html}
     {report_list_html}
 </div></body></html>
@@ -91,18 +84,32 @@ def generate_html_report(report_title: str, summary_items: dict, sections: list,
     print(f"\n✅ Report successfully generated: {report_path.resolve()}")
 
 
-def update_index_page():
+def update_index_page(audit_results=None):
     print("Updating reports index page...")
-    master_urls = get_master_php_urls()
-    existing_species = index_entries_by_url(SPECIES_DIR)
-    total_php_species = len(master_urls)
-    total_markdown_species = len(existing_species)
-    percentage_complete = (total_markdown_species / total_php_species * 100) if total_php_species > 0 else 0
     reports = []
     if not REPORT_DIR.is_dir():
         return
+    
+    # --- Data Integrity Summary ---
+    data_integrity_html = ""
+    if audit_results:
+        legacy_links = audit_results.get('legacy_links_count', 0)
+        
+        if legacy_links > 0:
+            data_integrity_html = f"""
+            <div class="summary-stats">
+                <h2>Data Integrity Issues</h2>
+                <div class="health-grid">
+                    <div class="stat-card {'critical' if legacy_links > 0 else ''}">
+                        <h3>Legacy PHP Links</h3>
+                        <div class="value">{legacy_links}</div>
+                        <div class="description">Files with links to old .php pages.</div>
+                    </div>
+                </div>
+            </div>
+            """
 
-    # --- NEW: Citation health summary logic ---
+    # --- Citation health summary logic ---
     citation_summary_html = ""
     citation_report_path = REPORT_DIR / CITATION_HEALTH_REPORT_FILENAME
     if citation_report_path.exists():
@@ -122,23 +129,23 @@ def update_index_page():
             citation_summary_html = f"""
             <div class="summary-stats">
                 <h2>Citation Health</h2>
-                <div class="citation-health-grid">
-                    <div class="citation-stat">
+                <div class="health-grid">
+                    <div class="stat-card">
                         <h3>Correct</h3>
                         <div class="value">{correct}</div>
                         <div class="percentage">{(correct / total * 100):.1f}%</div>
                     </div>
-                    <div class="citation-stat">
+                    <div class="stat-card">
                         <h3>Empty</h3>
                         <div class="value">{empty}</div>
                         <div class="percentage">{(empty / total * 100):.1f}%</div>
                     </div>
-                    <div class="citation-stat">
+                    <div class="stat-card">
                         <h3>No Markdown</h3>
                         <div class="value">{no_markdown}</div>
                         <div class="percentage">{(no_markdown / total * 100):.1f}%</div>
                     </div>
-                    <div class="citation-stat">
+                    <div class="stat-card">
                         <h3>Bad Format</h3>
                         <div class="value">{badly_formatted}</div>
                         <div class="percentage">{(badly_formatted / total * 100):.1f}%</div>
@@ -146,7 +153,6 @@ def update_index_page():
                 </div>
             </div>
             """
-    # --- END NEW SECTION ---
 
     for report_file in REPORT_DIR.glob("*.html"):
         if report_file.name == "index.html":
@@ -202,10 +208,8 @@ def update_index_page():
     
     index_content = INDEX_TEMPLATE.format(
         report_list_html=report_list_html,
-        total_php_species=total_php_species,
-        total_markdown_species=total_markdown_species,
-        percentage_complete=percentage_complete,
-        citation_summary_html=citation_summary_html # <-- NEW
+        citation_summary_html=citation_summary_html,
+        data_integrity_html=data_integrity_html
     )
     index_path = REPORT_DIR / "index.html"
     with open(index_path, 'w', encoding='utf-8') as f:

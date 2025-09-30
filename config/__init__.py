@@ -20,12 +20,14 @@ KNOWN_TAXONOMIC_STATUSES = MAPPINGS.get('KNOWN_TAXONOMIC_STATUSES', [])
 FIELDS_TO_DELETE = MAPPINGS.get('FIELDS_TO_DELETE', {})
 
 # --- CORE FILE SYSTEM PATHS ---
-# These paths are still best defined in Python as they relate to the code's location.
-SPECIES_DIR = Path("../moths-of-borneo/src/content/species/")
-GENERA_DIR = Path("../moths-of-borneo/src/content/genera/")
-CONTENT_DIR = Path("../moths-of-borneo/src/content/")
-PHP_ROOT_DIR = Path("../MoB-PHP/")
-REPORT_DIR = Path("./html/")
+# --- FIX: Make paths absolute and robust ---
+# This ensures paths work regardless of where the script is run.
+PROJECT_ROOT = CONFIG_DIR.parent
+SPECIES_DIR = PROJECT_ROOT.parent / "moths-of-borneo/src/content/species/"
+GENERA_DIR = PROJECT_ROOT.parent / "moths-of-borneo/src/content/genera/"
+CONTENT_DIR = PROJECT_ROOT.parent / "moths-of-borneo/src/content/"
+PHP_ROOT_DIR = PROJECT_ROOT.parent / "MoB-PHP/"
+REPORT_DIR = PROJECT_ROOT / "html/"
 
 # --- REPORTING ---
 AUDIT_REPORT_FILENAME = "audit_report.html"
