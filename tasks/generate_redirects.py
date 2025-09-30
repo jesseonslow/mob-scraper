@@ -1,9 +1,9 @@
 # tasks/generate_redirects.py
 
 import csv
-from file_system import build_legacy_to_new_url_map
+from core.file_system import build_legacy_to_new_url_map
 from config import REPORT_DIR, REDIRECT_REPORT_FILENAME
-from reporting import update_index_page
+from .reporting import update_index_page
 
 def run_generate_redirects():
     """

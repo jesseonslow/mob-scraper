@@ -1,8 +1,8 @@
 # selector_finder.py
 
 import re
-from processing import correct_text_spacing
-from file_system import update_config_file, create_markdown_file # <--- ADD create_markdown_file
+from .processing import correct_text_spacing
+from .file_system import update_config_file, create_markdown_file # <--- ADD create_markdown_file
 from tasks.utils import get_book_from_url # <--- ADD get_book_from_url
 
 def suggest_selectors(soup):

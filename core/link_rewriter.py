@@ -1,8 +1,6 @@
-# link_rewriter.py
-
 import re
 from urllib.parse import urlparse
-from file_system import build_legacy_to_new_url_map
+from .file_system import build_legacy_to_new_url_map
 
 _url_map = None
 

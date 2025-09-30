@@ -1,0 +1,23 @@
+# Rules for assigning a 'group' based on a substring in the legacy_url.
+GROUP_MAPPING:
+  "eugoawalker/": "eugoa"
+  "episparis/": "episparis"
+  "saroba/": "saroba"
+  "throana/": "throana"
+  "serrobes/": "serrobes"
+
+# A list of known taxonomic statuses to aid the parser.
+KNOWN_TAXONOMIC_STATUSES:
+  - "stat. rev."
+  - "stat. n."
+  - "comb. rev."
+  - "comb. n."
+  - "nom. nov."
+  - "syns. n."
+  - "syn. n."
+  - "sp. rev."
+  - "sp. n."
+  - "ssp."
+
+# A list of frontmatter fields to be unconditionally removed during cleanup tasks.
+FIELDS_TO_DELETE: {}

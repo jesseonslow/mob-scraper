@@ -1,0 +1,231 @@
+default:
+  citation_selector:
+    index: 0
+    method: build_citation_string
+    selector: 'p[class="MsoNormal"]'
+  content_selector:
+    index: 0
+    method: full_text
+    selector: 'p[align="justify"]'
+  name_selector:
+    index: 2
+    method: full_text
+    selector: b
+eight:
+  content_selector:
+    index: -1
+    method: full_text
+    selector: 'p[style*="text-align:justify"]'
+  genus_selector:
+    index: 0
+    method: full_text
+    selector: span
+  name_selector:
+    index: 1
+    method: position_1
+    selector: b
+eighteen:
+  author_selector:
+    index: 0
+    method: position_2
+    selector: span
+  citation_selector:
+    index: 0
+    method: build_citation_string
+    selector: 'p[class="MsoNormal"]'
+  content_selector:
+    index: -1
+    method: full_text
+    selector: 'p[align="justify"]'
+  genus_selector:
+    index: 2
+    method: position_1
+    selector: b
+  name_selector:
+    index: 1
+    method: position_1
+    selector: b
+eleven:
+  author_selector:
+    index: 0
+    method: position_3
+    selector: b
+  citation_selector:
+    index: 0
+    method: build_citation_string
+    selector: 'p[class="MsoNormal"]'
+  content_selector:
+  genus_selector:
+    index: 0
+    method: position_1
+    selector: span
+  name_selector:
+    index: 0
+    method: position_2
+    selector: span
+fifteen:
+  citation_selector:
+    index: 0
+    method: build_citation_string
+    selector: 'p[class="MsoNormal"]'
+  content_selector:
+    index: 0
+    method: full_text
+    selector: 'p[align="justify"]'
+  genus_selector:
+    index: 2
+    method: full_text
+    selector: b
+  name_selector:
+    index: 0
+    method: full_text
+    selector: b
+five:
+  citation_selector:
+    index: 0
+    method: build_citation_string
+    selector: 'p[class="MsoNormal"]'
+  content_selector:
+    index: 1
+    method: full_text
+    selector: 'p[style*="text-align:justify"]'
+  genus_selector:
+    index: 0
+    method: position_1
+    selector: b
+  name_selector:
+    index: 0
+    method: full_text
+    selector: b
+four:
+  author_selector:
+    index: 1
+    method: full_text
+    selector: b
+  citation_selector:
+    index: 0
+    method: build_citation_string
+    selector: 'p[class="MsoNormal"]'
+  content_selector:
+    index: 0
+    method: full_text
+    selector: 'p[align="justify"]'
+  genus_selector:
+    index: 0
+    method: position_1
+    selector: b
+  name_selector:
+    index: 2
+    method: position_2
+    selector: b
+fourteen:
+  author_selector:
+    index: 1
+    method: full_text
+    selector: span
+  citation_selector:
+    index: 0
+    method: build_citation_string
+    selector: 'p[class="MsoNormal"]'
+  content_selector:
+    index: 0
+    method: full_text
+    selector: 'p[style*="text-align:justify"]'
+  genus_selector:
+    index: 3
+    method: full_text
+    selector: b
+name_selector:
+  index: 0
+  method: position_2
+  selector: span
+nine:
+  author_selector:
+    index: 1
+    method: full_text
+    selector: span
+  citation_selector:
+    index: 0
+    method: build_citation_string
+    selector: 'p[class="MsoNormal"]'
+  content_selector:
+    index: 0
+    method: full_text
+    selector: 'p[style*="text-align:justify"]'
+  genus_selector:
+    index: 0
+    method: position_1
+    selector: span
+  name_selector:
+    index: 0
+    method: position_2
+    selector: span
+seven:
+  content_selector:
+    index: 1
+    method: full_text
+    selector: 'p[class="MsoNormal"]'
+  name_selector:
+    index: 0
+    method: first_word
+    selector: span
+seventeen:
+  author_selector:
+    index: 1
+    method: full_text
+    selector: span
+  content_selector:
+    index: 0
+    method: full_text
+    selector: 'p[align="justify"]'
+  genus_selector:
+    index: 0
+    method: position_1
+    selector: b
+  name_selector:
+    index: 0
+    method: position_1
+    selector: span
+ten:
+  author_selector:
+    index: 1
+    method: full_text
+    selector: span
+  content_selector:
+    index: 0
+    method: full_text
+    selector: 'p[align="justify"]'
+  genus_selector:
+    index: 0
+    method: position_1
+    selector: span
+  name_selector:
+    index: 0
+    method: position_2
+    selector: b
+thirteen:
+  author_selector:
+    index: 2
+    method: full_text
+    selector: span
+  content_selector:
+    index: 0
+    method: full_text
+    selector: 'p[align="justify"]'
+  genus_selector:
+    index: 0
+    method: full_text
+    selector: span
+  name_selector:
+    index: 1
+    method: full_text
+    selector: span
+three:
+  content_selector:
+    index: 5
+    method: full_text
+    selector: p
+  name_selector:
+    index: 0
+    method: full_text
+    selector: p.MsoNormal

@@ -3,12 +3,13 @@ from urllib.request import urlopen
 from bs4 import BeautifulSoup
 import config
 from reclassification_manager import add_reclassified_url
-from parser import parse_html_with_rules
-from file_system import update_config_file, create_markdown_file
-from processing import correct_text_spacing
-from selector_finder import suggest_selectors
-from tasks.utils import get_book_from_url, is_data_valid
-from scraper import SpeciesScraper, scrape_images_and_labels
+from core.parser import parse_html_with_rules
+from core.file_system import update_config_file
+from core.processing import correct_text_spacing
+from core.selector_finder import suggest_selectors
+from tasks.utils import get_book_from_url
+from models import Species
+from core.scraper import scrape_images_and_labels
 
 def _get_user_choice(data_type, suggestions, soup):
     """Displays suggestions and gets the user's choice for a rule and method."""

@@ -9,9 +9,9 @@ from config import (
     SPECIES_DIR, PHP_ROOT_DIR, LEGACY_URL_BASE, GROUP_MAPPING,
     FIELDS_TO_DELETE, BOOK_NUMBER_MAP  # <-- Add BOOK_NUMBER_MAP
 )
-from file_system import save_markdown_file
-from scraper import SpeciesScraper, scrape_images_and_labels
-from processing import clean_citation_frontmatter
+from core.file_system import save_markdown_file
+from core.scraper import scrape_images_and_labels
+from core.processing import clean_citation_frontmatter
 
 def _update_image_fields(post, genus_name):
     """

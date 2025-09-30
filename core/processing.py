@@ -1,8 +1,8 @@
 import re
 import yaml
 import frontmatter
-from link_rewriter import rewrite_legacy_links
-from markdown_formatter import format_markdown_text
+from .link_rewriter import rewrite_legacy_links
+from .markdown_formatter import format_markdown_text
 
 def format_body_content(markdown_text: str):
     """

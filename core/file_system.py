@@ -1,14 +1,13 @@
-# mob-scraper/file_system.py
-
 import frontmatter
 import re
-import ast
-import pprint
+import yaml
 from pathlib import Path
-import config
+from urllib.parse import urlparse
+
 from config import (
-    PHP_ROOT_DIR, LEGACY_URL_BASE, CONFIG_PATH, RULES_VAR_NAME
+    PHP_ROOT_DIR, LEGACY_URL_BASE, CONTENT_DIR, SPECIES_DIR
 )
+import config
 
 def get_master_php_urls():
     """
@@ -70,55 +69,19 @@ def index_entries_by_slug(directory: Path):
 
 def update_config_file(book_name, confirmed_rules):
     """
-    Safely reads, updates, and writes back the configuration file using an Abstract Syntax Tree (AST).
-    This method is robust against formatting changes and guarantees syntactically correct output.
+    Safely reads, updates, and writes back the scraping_rules.yaml file.
     """
-    print(f"\nUpdating '{CONFIG_PATH}' with new rules for book '{book_name}'...")
+    print(f"\nUpdating 'scraping_rules.yaml' with new rules for book '{book_name}'...")
     try:
-        content = CONFIG_PATH.read_text(encoding='utf-8')
-        tree = ast.parse(content)
-
-        # Find the assignment node for BOOK_SCRAPING_RULES
-        assignment_node = None
-        for node in ast.walk(tree):
-            if (isinstance(node, ast.Assign) and
-                    len(node.targets) == 1 and
-                    isinstance(node.targets[0], ast.Name) and
-                    node.targets[0].id == RULES_VAR_NAME):
-                assignment_node = node
-                break
-        
-        if not assignment_node or not isinstance(assignment_node.value, ast.Dict):
-            print(f"Error: Could not find the '{RULES_VAR_NAME}' dictionary in {CONFIG_PATH}.")
-            return
-
-        # Convert the AST dictionary to a Python dictionary
-        current_rules = ast.literal_eval(assignment_node.value)
-        
-        # Update the rules for the specific book
+        current_rules = config.SCRAPING_RULES
         current_rules[book_name] = confirmed_rules
-        
-        # Sort the dictionary by book name for consistent ordering
         sorted_rules = dict(sorted(current_rules.items()))
-
-        # Find the line numbers of the dictionary to replace
-        start_line = assignment_node.lineno
-        end_line = assignment_node.end_lineno
-        
-        original_lines = content.splitlines(keepends=True)
-        lines_before = original_lines[:start_line-1]
-        lines_after = original_lines[end_line:]
-
-        # Pretty-print the updated dictionary to a string
-        new_rules_str = pprint.pformat(sorted_rules, indent=4, width=120)
-        
-        # Reconstruct the file
-        new_content = "".join(lines_before)
-        new_content += f"{RULES_VAR_NAME} = {new_rules_str}\n"
-        new_content += "".join(lines_after)
-
-        CONFIG_PATH.write_text(new_content, encoding='utf-8')
+        rules_path = config.CONFIG_DIR / 'scraping_rules.yaml'
+        with open(rules_path, 'w', encoding='utf-8') as f:
+            yaml.dump(sorted_rules, f, default_flow_style=False, sort_keys=False, indent=2)
         print("✅ Config file updated successfully!")
+        
+        config.SCRAPING_RULES = sorted_rules
 
     except Exception as e:
         print(f"❌ Failed to update config file: {e}")

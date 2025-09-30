@@ -6,13 +6,14 @@ from itertools import groupby
 import frontmatter
 from pathlib import Path
 from bs4 import BeautifulSoup
+from models import Species
 
 import config
-from file_system import (
+from core.file_system import (
     get_master_php_urls, index_entries_by_url, index_entries_by_slug,
     create_markdown_file
 )
-from scraper import SpeciesScraper
+from core.scraper import SpeciesScraper
 from tasks.utils import get_contextual_data, get_book_from_url, is_data_valid
 from tasks.interactive_cli import run_interactive_session
 from reclassification_manager import load_reclassified_urls

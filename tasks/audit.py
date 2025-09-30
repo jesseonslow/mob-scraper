@@ -3,8 +3,8 @@ import frontmatter
 import re
 
 from config import SPECIES_DIR, GENERA_DIR, CONTENT_QUALITY_REPORT_FILENAME
-from file_system import get_master_php_urls, index_entries_by_url, index_entries_by_slug
-from reporting import generate_html_report, update_index_page
+from core.file_system import get_master_php_urls, index_entries_by_url, index_entries_by_slug
+from .reporting import generate_html_report, update_index_page
 from tasks.utils import get_contextual_data
 
 def run_audit():

@@ -3,7 +3,7 @@
 import collections
 import frontmatter
 from config import SPECIES_DIR, CITATION_HEALTH_REPORT_FILENAME
-from reporting import generate_html_report, update_index_page
+from .reporting import generate_html_report, update_index_page
 
 def run_citation_audit():
     """

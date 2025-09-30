@@ -1,9 +1,9 @@
 from bs4 import BeautifulSoup
 import re
 from pathlib import Path
-from config import BOOK_NUMBER_MAP, BOOK_SCRAPING_RULES, CDN_BASE_URL, DEFAULT_PLATE
-from parser import parse_html_with_rules
-from html_preprocessor import remove_font_tags
+from config import BOOK_NUMBER_MAP, SCRAPING_RULES, CDN_BASE_URL, DEFAULT_PLATE
+from .parser import parse_html_with_rules
+from .html_preprocessor import remove_font_tags
 
 def scrape_images_and_labels(soup: BeautifulSoup, book_name: str, book_number: str) -> tuple:
     """

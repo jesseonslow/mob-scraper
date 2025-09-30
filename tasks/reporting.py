@@ -7,7 +7,7 @@ from html import escape
 from bs4 import BeautifulSoup
 
 from config import REPORT_DIR, SPECIES_DIR, CITATION_HEALTH_REPORT_FILENAME
-from file_system import get_master_php_urls, index_entries_by_url
+from core.file_system import get_master_php_urls, index_entries_by_url
 
 INDEX_TEMPLATE = """
 <!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>Scraper Reports Index</title>

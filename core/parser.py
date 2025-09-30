@@ -3,9 +3,9 @@ import string
 from bs4 import BeautifulSoup
 from markdownify import markdownify
 from soupsieve.util import SelectorSyntaxError
-from processing import format_body_content, correct_text_spacing, replace_ocr_symbols
+from .processing import format_body_content, correct_text_spacing, replace_ocr_symbols
 from config import KNOWN_TAXONOMIC_STATUSES
-from citation_scraper import scrape_and_format_citation
+from .citation_scraper import scrape_and_format_citation
 
 def _apply_method(text: str, method: str) -> str:
     """Applies a specific post-processing method to the extracted text."""
