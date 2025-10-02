@@ -2,19 +2,27 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{report_title}</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.css">
     <link rel="stylesheet" href="style.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/sortable/0.8.0/js/sortable.min.js"></script>
     <script src="script.js"></script>
 </head>
 <body>
-    <div class="container">
-        <h1>{report_title}</h1>
-        {summary_html}
-        {sections_html}
-        <div class="footer">
+    <main class="container">
+        <header>
+            <h1>{report_title}</h1>
+        </header>
+        <section>
+            {summary_html}
+        </section>
+        <section>
+            {sections_html}
+        </section>
+        <footer>
             <p>Report generated on {generation_date}</p>
-        </div>
-    </div>
+        </footer>
+    </main>
 </body>
 </html>

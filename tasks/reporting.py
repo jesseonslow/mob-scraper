@@ -40,9 +40,12 @@ def generate_html_report(report_title: str, summary_items: dict, sections: list,
     
     sections_html = ""
     for section in sections:
-        sections_html += f"<h2>{escape(section['title'])}</h2>"
-        sections_html += section['content']
-    
+        # If the section is collapsible, wrap it in <details> tags
+        if section.get('collapsible'):
+            sections_html += f"<details><summary><h2>{escape(section['title'])}</h2></summary>{section['content']}</details>"
+        else:
+            sections_html += f"<h2>{escape(section['title'])}</h2>{section['content']}"
+
     template_path = TEMPLATE_DIR / "report_template.html"
     if not template_path.exists():
         print(f"  [ERROR] Report template not found at {template_path}")
@@ -88,46 +91,8 @@ def update_index_page(audit_results=None):
             </div>
             """
 
+    # Remove the redundant citation summary
     citation_summary_html = ""
-    citation_report_path = REPORT_DIR / CITATION_HEALTH_REPORT_FILENAME
-    if citation_report_path.exists():
-        with open(citation_report_path, 'r', encoding='utf-8') as f:
-            soup = BeautifulSoup(f.read(), 'html.parser')
-        
-        summary_list_items = soup.select('.summary-item')
-        stats = {li.contents[0].strip().replace(':', ''): int(li.find('strong').text) for li in summary_list_items if li.find('strong')}
-        
-        # --- THIS IS THE FIX ---
-        # Use the new, correct keys from the summary.
-        total_files = stats.get("Total Files Scanned", 0)
-        formatted = stats.get("Number of Files with Formatted Citations", 0)
-        unformatted = stats.get("Number of Files with Unformatted Citations", 0)
-        empty = stats.get("Number of Files with No Citations", 0)
-        broken = stats.get("Number of Files with Broken Citations", 0)
-
-        citation_summary_html = f"""
-        <div class="summary-stats">
-            <h2>Citation Health</h2>
-            <div class="health-grid">
-                <div class="stat-card">
-                    <h3>Formatted</h3>
-                    <div class="value">{formatted}</div>
-                </div>
-                <div class="stat-card">
-                    <h3>Unformatted</h3>
-                    <div class="value">{unformatted}</div>
-                </div>
-                <div class="stat-card">
-                    <h3>Empty</h3>
-                    <div class="value">{empty}</div>
-                </div>
-                <div class="stat-card {'critical' if broken > 0 else ''}">
-                    <h3>Broken</h3>
-                    <div class="value">{broken}</div>
-                </div>
-            </div>
-        </div>
-        """
         
     genera_summary_html = ""
     content_report_path = REPORT_DIR / CONTENT_QUALITY_REPORT_FILENAME
@@ -199,17 +164,15 @@ def update_index_page(audit_results=None):
     if reports:
         for report in reports:
             report_list_html += f"""
-            <div class="report-item">
-                <div class="report-header">
+            <article>
+                <header>
                     <h2><a href="{report['filename']}" target="_blank">{escape(report['title'])}</a></h2>
-                    <p class="report-meta">
+                    <p>
                         Generated on {report['date'].strftime("%Y-%m-%d %H:%M:%S")} | File: <code>{report['filename']}</code>
                     </p>
-                </div>
-                <div class="report-summary">
-                    {report['summary_html']}
-                </div>
-            </div>
+                </header>
+                {report['summary_html']}
+            </article>
             """
     
     template_path = TEMPLATE_DIR / "index_template.html"
@@ -220,9 +183,9 @@ def update_index_page(audit_results=None):
     index_template_content = template_path.read_text(encoding='utf-8')
     index_content = index_template_content.format(
         report_list_html=report_list_html,
-        citation_summary_html=citation_summary_html,
         data_integrity_html=data_integrity_html,
-        genera_summary_html=genera_summary_html
+        genera_summary_html=genera_summary_html,
+        citation_summary_html=citation_summary_html
     )
     index_path = REPORT_DIR / "index.html"
     with open(index_path, 'w', encoding='utf-8') as f:

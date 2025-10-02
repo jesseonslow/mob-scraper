@@ -2,73 +2,65 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Scraper Reports Index</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@1/css/pico.min.css">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div class="container">
+    <main class="container">
         <h1>📊 Scraper Reports Index</h1>
         
         
         <div class="summary-stats">
-            <h2>Citation Health</h2>
+            <h2>Genera Health</h2>
             <div class="health-grid">
-                <div class="stat-card">
-                    <h3>Formatted</h3>
-                    <div class="value">327</div>
-                </div>
-                <div class="stat-card">
-                    <h3>Unformatted</h3>
-                    <div class="value">1352</div>
-                </div>
-                <div class="stat-card">
-                    <h3>Empty</h3>
-                    <div class="value">2367</div>
-                </div>
                 <div class="stat-card critical">
-                    <h3>Broken</h3>
-                    <div class="value">41</div>
+                    <h3>Missing Files</h3>
+                    <div class="value">20</div>
+                </div>
+                <div class="stat-card">
+                    <h3>Empty Content</h3>
+                    <div class="value">985</div>
+                </div>
+                <div class="stat-card ">
+                    <h3>Badly Formatted</h3>
+                    <div class="value">0</div>
                 </div>
             </div>
         </div>
         
         
-            <div class="report-item">
-                <div class="report-header">
+            <article>
+                <header>
+                    <h2><a href="citation_health_report.html" target="_blank">📝 Citation Health Report</a></h2>
+                    <p>
+                        Generated on 2025-10-02 20:42:36 | File: <code>citation_health_report.html</code>
+                    </p>
+                </header>
+                <ul><li class="summary-item">Total Files Scanned: <strong>4244</strong></li><li class="summary-item">Number of Files with Formatted Citations: <strong>327</strong></li><li class="summary-item">Number of Files with Unformatted Citations: <strong>1352</strong></li><li class="summary-item">Number of Files with No Citations: <strong>2367</strong></li><li class="summary-item" style="color: #c0392b;">Number of Files with Broken Citations: <strong>41</strong></li></ul>
+            </article>
+            
+            <article>
+                <header>
+                    <h2><a href="content_quality_report.html" target="_blank">📊 Comprehensive Content Audit</a></h2>
+                    <p>
+                        Generated on 2025-10-02 20:42:34 | File: <code>content_quality_report.html</code>
+                    </p>
+                </header>
+                <ul><li class="summary-item" style="color: #c0392b;">Action Required: Files with Legacy `.php` Links: <strong>183</strong></li><li class="summary-item" style="color: #c0392b;">Action Required: Files Missing Context: <strong>2</strong></li><li class="summary-item" style="color: #c0392b;">Action Required: Missing Genera Files: <strong>20</strong></li><li class="summary-item">Files Ready to Scrape: <strong>0</strong></li><li class="summary-item">Total Missing Files: <strong>2</strong></li><li class="summary-item">Existing Species Pages with NO content: <strong>17</strong></li><li class="summary-item">Existing Species Pages with UNFINISHED content: <strong>369</strong></li><li class="summary-item">Existing Genera Pages with NO content: <strong>985</strong></li><li class="summary-item">Existing Genera Pages with BADLY FORMATTED content: <strong>0</strong></li></ul>
+            </article>
+            
+            <article>
+                <header>
                     <h2><a href="publication_index_report.html" target="_blank">📚 Publication Index</a></h2>
-                    <p class="report-meta">
+                    <p>
                         Generated on 2025-10-02 19:24:36 | File: <code>publication_index_report.html</code>
                     </p>
-                </div>
-                <div class="report-summary">
-                    <ul><li class="summary-item">Total Unique Publications Found: <strong>808</strong></li></ul>
-                </div>
-            </div>
+                </header>
+                <ul><li class="summary-item">Total Unique Publications Found: <strong>808</strong></li></ul>
+            </article>
             
-            <div class="report-item">
-                <div class="report-header">
-                    <h2><a href="citation_health_report.html" target="_blank">📝 Citation Health Report</a></h2>
-                    <p class="report-meta">
-                        Generated on 2025-10-02 19:19:48 | File: <code>citation_health_report.html</code>
-                    </p>
-                </div>
-                <div class="report-summary">
-                    <ul><li class="summary-item">Total Files Scanned: <strong>4244</strong></li><li class="summary-item">Number of Files with Formatted Citations: <strong>327</strong></li><li class="summary-item">Number of Files with Unformatted Citations: <strong>1352</strong></li><li class="summary-item">Number of Files with No Citations: <strong>2367</strong></li><li class="summary-item" style="color: #c0392b;">Number of Files with Broken Citations: <strong>41</strong></li></ul>
-                </div>
-            </div>
-            
-            <div class="report-item">
-                <div class="report-header">
-                    <h2><a href="content_quality_report.html" target="_blank">📊 Comprehensive Content Audit</a></h2>
-                    <p class="report-meta">
-                        Generated on 2025-10-02 19:19:45 | File: <code>content_quality_report.html</code>
-                    </p>
-                </div>
-                <div class="report-summary">
-                    <ul><li class="summary-item" style="color: #c0392b;">Action Required: Files with Legacy `.php` Links: <strong>183</strong></li><li class="summary-item" style="color: #c0392b;">Action Required: Files Missing Context: <strong>2</strong></li><li class="summary-item" style="color: #c0392b;">Action Required: Missing Genera Files: <strong>20</strong></li><li class="summary-item">Files Ready to Scrape: <strong>0</strong></li><li class="summary-item">Total Missing Files: <strong>2</strong></li><li class="summary-item">Existing Species Pages with NO content: <strong>17</strong></li><li class="summary-item">Existing Species Pages with UNFINISHED content: <strong>369</strong></li><li class="summary-item">Existing Genera Pages with NO content: <strong>985</strong></li><li class="summary-item">Existing Genera Pages with BADLY FORMATTED content: <strong>0</strong></li></ul>
-                </div>
-            </div>
-            
-    </div>
+    </main>
 </body>
 </html>
