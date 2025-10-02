@@ -20,14 +20,13 @@ KNOWN_TAXONOMIC_STATUSES = MAPPINGS.get('KNOWN_TAXONOMIC_STATUSES', [])
 FIELDS_TO_DELETE = MAPPINGS.get('FIELDS_TO_DELETE', {})
 
 # --- CORE FILE SYSTEM PATHS ---
-# --- FIX: Make paths absolute and robust ---
-# This ensures paths work regardless of where the script is run.
 PROJECT_ROOT = CONFIG_DIR.parent
 SPECIES_DIR = PROJECT_ROOT.parent / "moths-of-borneo/src/content/species/"
 GENERA_DIR = PROJECT_ROOT.parent / "moths-of-borneo/src/content/genera/"
 CONTENT_DIR = PROJECT_ROOT.parent / "moths-of-borneo/src/content/"
 PHP_ROOT_DIR = PROJECT_ROOT.parent / "MoB-PHP/"
 REPORT_DIR = PROJECT_ROOT / "html/"
+TEMPLATE_DIR = REPORT_DIR / "src"
 
 # --- REPORTING ---
 AUDIT_REPORT_FILENAME = "audit_report.html"
@@ -35,6 +34,7 @@ CONTENT_QUALITY_REPORT_FILENAME = "content_quality_report.html"
 IMAGE_UPDATE_REPORT_FILENAME = "image_update_report.html"
 REDIRECT_REPORT_FILENAME = "redirects.csv"
 CITATION_HEALTH_REPORT_FILENAME = "citation_health_report.html"
+PUBLICATION_INDEX_REPORT_FILENAME = "publication_index_report.html"
 
 # --- URLS & DEFAULTS ---
 LEGACY_URL_BASE = "https://www.mothsofborneo.com/"

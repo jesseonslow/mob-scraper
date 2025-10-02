@@ -1,5 +1,6 @@
 import re
 import config
+from bs4 import BeautifulSoup
 
 def get_contextual_data(missing_url, existing_species, existing_genera_by_url, existing_genera_by_slug):
     """
@@ -108,3 +109,37 @@ def is_data_valid(scraped_data: dict):
             failures.append('content')
 
     return failures
+
+def load_reference_lookup():
+    """
+    Scans all references.php files and returns a set of all reference strings.
+    """
+    print("Building reference lookup from all references.php files...")
+    lookup = set()
+    reference_files = list(config.PHP_ROOT_DIR.glob('**/references.php'))
+    
+    for ref_path in reference_files:
+        try:
+            with open(ref_path, 'r', encoding='utf-8', errors='ignore') as f:
+                html_content = f.read()
+            
+            soup = BeautifulSoup(html_content, 'html.parser')
+            
+            container = None
+            for p_tag in soup.find_all('p'):
+                if re.search(r'\(\d{4}\)', p_tag.get_text()):
+                    container = p_tag
+                    break
+            
+            if container:
+                references_html = str(container)
+                individual_references = re.split(r'<br\s*/?>', references_html, flags=re.IGNORECASE)
+                for ref_html in individual_references:
+                    text = BeautifulSoup(ref_html, 'html.parser').get_text(strip=True)
+                    if text:
+                        lookup.add(text)
+        except Exception:
+            continue
+            
+    print(f"Reference lookup built with {len(lookup)} entries.")
+    return lookup

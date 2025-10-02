@@ -3,65 +3,36 @@ from datetime import datetime
 from pathlib import Path
 from html import escape
 from bs4 import BeautifulSoup
+import shutil
 
-from config import REPORT_DIR, SPECIES_DIR, CITATION_HEALTH_REPORT_FILENAME
+from config import REPORT_DIR, TEMPLATE_DIR, CITATION_HEALTH_REPORT_FILENAME
 from core.file_system import get_master_php_urls, index_entries_by_url
 from reclassification_manager import load_reclassified_urls
 
-INDEX_TEMPLATE = """
-<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>Scraper Reports Index</title>
-<style>
-    body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; line-height: 1.6; margin: 0; background-color: #f9f9f9; color: #333; }}
-    .container {{ max-width: 900px; margin: 2em auto; padding: 0 1em; }}
-    h1 {{ color: #333; border-bottom: 2px solid #eee; padding-bottom: 0.5em; }}
-    .summary-stats {{ background: #fff; border: 1px solid #ddd; padding: 1.5em; margin-bottom: 2em; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }}
-    .report-item {{ background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 2em; overflow: hidden; }}
-    .report-header {{ background-color: #f7f7f7; padding: 1em 1.5em; border-bottom: 1px solid #eee; }}
-    .report-header h2 {{ margin: 0; font-size: 1.5em; }}
-    .report-header a {{ color: #005a9c; text-decoration: none; }}
-    .report-header a:hover {{ text-decoration: underline; }}
-    .report-meta {{ font-size: 0.9em; color: #555; }}
-    .report-summary {{ padding: 1.5em; }}
-    .report-summary ul {{ margin: 0; padding-left: 1.2em; }}
-    .report-summary li {{ margin-bottom: 0.5em; }}
-    .health-grid {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1em; }}
-    .stat-card {{ background: #f9f9f9; padding: 1em; border-radius: 5px; text-align: center; }}
-    .stat-card h3 {{ margin: 0 0 0.5em; font-size: 1.1em; color: #333; }}
-    .stat-card .value {{ font-size: 2em; font-weight: bold; color: #005a9c; }}
-    .stat-card .percentage, .stat-card .description {{ font-size: 0.9em; color: #555; }}
-    .stat-card.critical .value {{ color: #c0392b; }}
-</style></head><body>
-<div class="container">
-    <h1>📊 Scraper Reports Index</h1>
-    {data_integrity_html}
-    {citation_summary_html}
-    {report_list_html}
-</div></body></html>
-"""
+def _copy_asset_files():
+    """
+    Copies static CSS and JS files from the template directory to the report
+    output directory.
+    """
+    if not TEMPLATE_DIR.is_dir():
+        print(f"  [WARNING] Template directory not found at {TEMPLATE_DIR}")
+        return
+        
+    REPORT_DIR.mkdir(parents=True, exist_ok=True)
+    
+    for asset in ["style.css", "script.js"]:
+        source_path = TEMPLATE_DIR / asset
+        dest_path = REPORT_DIR / asset
+        if source_path.exists():
+            shutil.copy2(source_path, dest_path)
 
-HTML_TEMPLATE = """
-<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>{report_title}</title>
-<style>
-    body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; line-height: 1.6; margin: 0; background-color: #f9f9f9; color: #333; }}
-    .container {{ max-width: 900px; margin: 2em auto; background: white; padding: 2em; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }}
-    h1, h2 {{ color: #333; border-bottom: 2px solid #eee; padding-bottom: 0.5em; }}
-    ul {{ list-style-type: none; padding-left: 0; }}
-    li {{ background-color: #fdfdfd; border: 1px solid #eee; padding: 10px; margin-bottom: 5px; border-radius: 4px; }}
-    code {{ background-color: #eef; padding: 2px 5px; border-radius: 3px; font-size: 0.9em; word-break: break-all; }}
-    .summary-item strong {{ color: #005a9c; }}
-    .footer {{ text-align: center; color: #777; font-size: 0.9em; margin-top: 2em; }}
-</style></head>
-<body><div class="container"><h1>{report_title}</h1>{summary_html}{sections_html}
-<div class="footer"><p>Report generated on {generation_date}</p></div>
-</div></body></html>
-"""
 
 def generate_html_report(report_title: str, summary_items: dict, sections: list, output_filename: str):
-    REPORT_DIR.mkdir(parents=True, exist_ok=True)
+    _copy_asset_files()
     
     summary_html = "<h2>Summary</h2><ul>"
     for key, value in summary_items.items():
-        style = ' style="color: #c0392b;"' if "Action Required" in key or "Badly" in key else ""
+        style = ' style="color: #c0392b;"' if "Action Required" in key or "Badly" in key or "Broken" in key else ""
         summary_html += f'<li class="summary-item"{style}>{key}: <strong>{value}</strong></li>'
     summary_html += "</ul>"
     
@@ -70,7 +41,13 @@ def generate_html_report(report_title: str, summary_items: dict, sections: list,
         sections_html += f"<h2>{escape(section['title'])}</h2>"
         sections_html += section['content']
     
-    final_html = HTML_TEMPLATE.format(
+    template_path = TEMPLATE_DIR / "report_template.html"
+    if not template_path.exists():
+        print(f"  [ERROR] Report template not found at {template_path}")
+        return
+
+    html_template_content = template_path.read_text(encoding='utf-8')
+    final_html = html_template_content.format(
         report_title=report_title,
         summary_html=summary_html,
         sections_html=sections_html,
@@ -85,12 +62,12 @@ def generate_html_report(report_title: str, summary_items: dict, sections: list,
 
 
 def update_index_page(audit_results=None):
+    _copy_asset_files()
     print("Updating reports index page...")
     reports = []
     if not REPORT_DIR.is_dir():
         return
     
-    # --- Data Integrity Summary ---
     data_integrity_html = ""
     if audit_results:
         legacy_links = audit_results.get('legacy_links_count', 0)
@@ -109,7 +86,6 @@ def update_index_page(audit_results=None):
             </div>
             """
 
-    # --- Citation health summary logic ---
     citation_summary_html = ""
     citation_report_path = REPORT_DIR / CITATION_HEALTH_REPORT_FILENAME
     if citation_report_path.exists():
@@ -117,42 +93,39 @@ def update_index_page(audit_results=None):
             soup = BeautifulSoup(f.read(), 'html.parser')
         
         summary_list_items = soup.select('.summary-item')
-        stats = {li.contents[0].strip().replace(':', ''): int(li.find('strong').text) for li in summary_list_items}
+        stats = {li.contents[0].strip().replace(':', ''): int(li.find('strong').text) for li in summary_list_items if li.find('strong')}
         
-        total = stats.get("Total Files Scanned", 0)
-        if total > 0:
-            correct = stats.get("Correctly Formatted", 0)
-            empty = stats.get("Empty", 0)
-            no_markdown = stats.get("No Markdown", 0)
-            badly_formatted = stats.get("Badly Formatted", 0)
+        # --- THIS IS THE FIX ---
+        # Use the new, correct keys from the summary.
+        total_files = stats.get("Total Files Scanned", 0)
+        formatted = stats.get("Number of Files with Formatted Citations", 0)
+        unformatted = stats.get("Number of Files with Unformatted Citations", 0)
+        empty = stats.get("Number of Files with No Citations", 0)
+        broken = stats.get("Number of Files with Broken Citations", 0)
 
-            citation_summary_html = f"""
-            <div class="summary-stats">
-                <h2>Citation Health</h2>
-                <div class="health-grid">
-                    <div class="stat-card">
-                        <h3>Correct</h3>
-                        <div class="value">{correct}</div>
-                        <div class="percentage">{(correct / total * 100):.1f}%</div>
-                    </div>
-                    <div class="stat-card">
-                        <h3>Empty</h3>
-                        <div class="value">{empty}</div>
-                        <div class="percentage">{(empty / total * 100):.1f}%</div>
-                    </div>
-                    <div class="stat-card">
-                        <h3>No Markdown</h3>
-                        <div class="value">{no_markdown}</div>
-                        <div class="percentage">{(no_markdown / total * 100):.1f}%</div>
-                    </div>
-                    <div class="stat-card">
-                        <h3>Bad Format</h3>
-                        <div class="value">{badly_formatted}</div>
-                        <div class="percentage">{(badly_formatted / total * 100):.1f}%</div>
-                    </div>
+        citation_summary_html = f"""
+        <div class="summary-stats">
+            <h2>Citation Health</h2>
+            <div class="health-grid">
+                <div class="stat-card">
+                    <h3>Formatted</h3>
+                    <div class="value">{formatted}</div>
+                </div>
+                <div class="stat-card">
+                    <h3>Unformatted</h3>
+                    <div class="value">{unformatted}</div>
+                </div>
+                <div class="stat-card">
+                    <h3>Empty</h3>
+                    <div class="value">{empty}</div>
+                </div>
+                <div class="stat-card {'critical' if broken > 0 else ''}">
+                    <h3>Broken</h3>
+                    <div class="value">{broken}</div>
                 </div>
             </div>
-            """
+        </div>
+        """
 
     for report_file in REPORT_DIR.glob("*.html"):
         if report_file.name == "index.html":
@@ -188,9 +161,7 @@ def update_index_page(audit_results=None):
     reports.sort(key=lambda r: r['date'], reverse=True)
 
     report_list_html = ""
-    if not reports:
-        report_list_html = "<p>No reports found.</p>"
-    else:
+    if reports:
         for report in reports:
             report_list_html += f"""
             <div class="report-item">
@@ -206,7 +177,13 @@ def update_index_page(audit_results=None):
             </div>
             """
     
-    index_content = INDEX_TEMPLATE.format(
+    template_path = TEMPLATE_DIR / "index_template.html"
+    if not template_path.exists():
+        print(f"  [ERROR] Index template not found at {template_path}")
+        return
+        
+    index_template_content = template_path.read_text(encoding='utf-8')
+    index_content = index_template_content.format(
         report_list_html=report_list_html,
         citation_summary_html=citation_summary_html,
         data_integrity_html=data_integrity_html

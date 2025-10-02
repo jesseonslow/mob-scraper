@@ -6,6 +6,8 @@ from tasks.cleanup import run_cleanup
 from tasks.audit import run_audit
 from tasks.generate_redirects import run_generate_redirects
 from tasks.citation_audit import run_citation_audit
+from tasks.build_publication_index import run_build_publication_index
+from tasks.format_citations import run_format_citations
 
 def main():
     """
@@ -48,6 +50,29 @@ def main():
         help="Generate a report on the health of citations in all species files."
     )
     citation_audit_parser.set_defaults(handler=run_citation_audit)
+    
+    build_publication_index_parser = subparsers.add_parser(
+        "build-publication-index",
+        help="Build a publication index from all references.php files."
+    )
+    build_publication_index_parser.set_defaults(handler=run_build_publication_index)
+
+    format_citations_parser = subparsers.add_parser(
+        "format-citation",
+        help="Finds and formats citations for a given publication, with an option to normalize the name."
+    )
+    format_citations_parser.add_argument(
+        "publication",
+        type=str,
+        help="The title of the publication to find."
+    )
+    format_citations_parser.add_argument(
+        "--to",
+        type=str,
+        dest="canonical_name",
+        help="The new, canonical name to apply to the publication."
+    )
+    format_citations_parser.set_defaults(handler=run_format_citations)
 
     args = parser.parse_args()
     
@@ -64,7 +89,9 @@ def main():
                 fields=args.fields,
                 citations=args.citations
             )
-        elif args.command in ['audit', 'redirects', 'citation-audit']:
+        elif args.command == 'format-citation':
+            args.handler(publication_title=args.publication, canonical_name=args.canonical_name)
+        elif args.command in ['audit', 'redirects', 'citation-audit', 'build-publication-index']:
             args.handler()
     else:
         parser.print_help()
