@@ -40,7 +40,6 @@ def generate_html_report(report_title: str, summary_items: dict, sections: list,
     
     sections_html = ""
     for section in sections:
-        # If the section is collapsible, wrap it in <details> tags
         if section.get('collapsible'):
             sections_html += f"<details><summary><h2>{escape(section['title'])}</h2></summary>{section['content']}</details>"
         else:
@@ -90,42 +89,6 @@ def update_index_page(audit_results=None):
                 </div>
             </div>
             """
-
-    # Remove the redundant citation summary
-    citation_summary_html = ""
-        
-    genera_summary_html = ""
-    content_report_path = REPORT_DIR / CONTENT_QUALITY_REPORT_FILENAME
-    if content_report_path.exists():
-        with open(content_report_path, 'r', encoding='utf-8') as f:
-            soup = BeautifulSoup(f.read(), 'html.parser')
-        
-        summary_list_items = soup.select('.summary-item')
-        stats = {li.contents[0].strip().replace(':', ''): int(li.find('strong').text) for li in summary_list_items if li.find('strong')}
-
-        missing = stats.get("Action Required Missing Genera Files", 0)
-        empty = stats.get("Existing Genera Pages with NO content", 0)
-        bad_format = stats.get("Existing Genera Pages with BADLY FORMATTED content", 0)
-
-        genera_summary_html = f"""
-        <div class="summary-stats">
-            <h2>Genera Health</h2>
-            <div class="health-grid">
-                <div class="stat-card {'critical' if missing > 0 else ''}">
-                    <h3>Missing Files</h3>
-                    <div class="value">{missing}</div>
-                </div>
-                <div class="stat-card">
-                    <h3>Empty Content</h3>
-                    <div class="value">{empty}</div>
-                </div>
-                <div class="stat-card {'critical' if bad_format > 0 else ''}">
-                    <h3>Badly Formatted</h3>
-                    <div class="value">{bad_format}</div>
-                </div>
-            </div>
-        </div>
-        """
 
     for report_file in REPORT_DIR.glob("*.html"):
         if report_file.name == "index.html":
@@ -183,9 +146,7 @@ def update_index_page(audit_results=None):
     index_template_content = template_path.read_text(encoding='utf-8')
     index_content = index_template_content.format(
         report_list_html=report_list_html,
-        data_integrity_html=data_integrity_html,
-        genera_summary_html=genera_summary_html,
-        citation_summary_html=citation_summary_html
+        data_integrity_html=data_integrity_html
     )
     index_path = REPORT_DIR / "index.html"
     with open(index_path, 'w', encoding='utf-8') as f:
