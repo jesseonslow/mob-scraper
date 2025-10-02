@@ -71,19 +71,17 @@ class SpeciesScraper:
     Orchestrates the scraping of a species page by calling specialized modules.
     """
     def __init__(self, html_content: str, book_name: str, genus_name: str):
-        # --- THIS IS THE FIX ---
-        # 1. Clean the raw HTML before parsing.
         cleaned_html = remove_font_tags(html_content)
-        
-        # 2. Parse the *cleaned* HTML with BeautifulSoup.
         self.soup = BeautifulSoup(cleaned_html, 'html.parser')
         
         self.book_name = book_name
         self.book_number = BOOK_NUMBER_MAP.get(book_name)
         self.genus_fallback = genus_name
-                # 1. Get the appropriate set of rules for the book.
-        self.rules = SCRAPING_RULES.get(book_name, SCRAPING_RULES.get('default', {}))
-        # 2. Add the book's name to the rules dictionary so the parser can identify it.
+        
+        # Get rules from the new manager
+        self.rules = config_manager.get_rules_for_book(book_name)
+        
+        # Add the book's name to the rules dictionary so the parser can identify it.
         self.rules['book_name'] = book_name
     
     def scrape_all(self):

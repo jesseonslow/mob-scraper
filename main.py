@@ -1,3 +1,5 @@
+# main.py
+
 import argparse
 import sys
 
@@ -8,6 +10,7 @@ from tasks.generate_redirects import run_generate_redirects
 from tasks.citation_audit import run_citation_audit
 from tasks.build_publication_index import run_build_publication_index
 from tasks.format_citations import run_format_citations
+from tasks.scrape_genera import run_scrape_genera
 
 def main():
     """
@@ -38,6 +41,12 @@ def main():
         help="Launch the interactive selector finder for books with missing or failing rules."
     )
     scrape_parser.set_defaults(handler=run_scrape_new)
+    
+    scrape_genera_parser = subparsers.add_parser(
+        "scrape-genera",
+        help="Scrape body content for existing genera files."
+    )
+    scrape_genera_parser.set_defaults(handler=run_scrape_genera)
 
     audit_parser = subparsers.add_parser(
         "audit",
@@ -91,7 +100,7 @@ def main():
             )
         elif args.command == 'format-citation':
             args.handler(publication_title=args.publication, canonical_name=args.canonical_name)
-        elif args.command in ['audit', 'redirects', 'citation-audit', 'build-publication-index']:
+        elif args.command in ['audit', 'redirects', 'citation-audit', 'build-publication-index', 'scrape-genera']:
             args.handler()
     else:
         parser.print_help()

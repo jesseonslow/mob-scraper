@@ -9,12 +9,12 @@ from bs4 import BeautifulSoup
 from models import Species
 
 import config
+from core.config_manager import config_manager
 from core.file_system import (
-    get_master_php_urls, index_entries_by_url, index_entries_by_slug,
-    create_markdown_file
+    get_master_php_urls, index_entries_by_url, index_entries_by_slug
 )
 from core.scraper import SpeciesScraper
-from tasks.utils import get_contextual_data, get_book_from_url, is_data_valid
+from tasks.utils import get_contextual_data, get_book_from_url
 from tasks.interactive_cli import run_interactive_session
 from reclassification_manager import load_reclassified_urls
 
@@ -76,8 +76,9 @@ def run_scrape_new(generate_files=False, interactive=False, force=False):
             url_to_test = entry_to_test['url']
             context_genus = entry_to_test['neighbor_data'].get('genus') if entry_to_test['context_type'] == 'species' else entry_to_test['neighbor_data'].get('name')
 
-            if book_name not in config.SCRAPING_RULES:
-                print(f"\n[!] No rules found for book: '{book_name}'.")
+            rules_for_book = config_manager.get_rules_for_book(book_name)
+            if not rules_for_book or rules_for_book == config_manager.get_rules_for_book('default'):
+                print(f"\n[!] No specific rules found for book: '{book_name}'.")
                 status = run_interactive_session(entry_to_test, existing_rules=None, failed_fields=None)
                 if status == 'skip_book': books_to_skip.add(book_name)
                 elif status in ['reclassified', 'rules_updated', 'rules_updated_and_file_saved']: importlib.reload(config)
@@ -119,8 +120,9 @@ def run_scrape_new(generate_files=False, interactive=False, force=False):
             book_name = get_book_from_url(url)
             if book_name in books_to_skip: continue
             
-            if book_name not in config.SCRAPING_RULES:
-                print(f"  -> SKIPPING {Path(url).name}: No rules defined for book '{book_name}'.")
+            rules_for_book = config_manager.get_rules_for_book(book_name)
+            if not rules_for_book or rules_for_book == config_manager.get_rules_for_book('default'):
+                print(f"  -> SKIPPING {Path(url).name}: No specific rules defined for book '{book_name}'.")
                 continue
 
             relative_path = url.replace(config.LEGACY_URL_BASE, "")
@@ -134,13 +136,15 @@ def run_scrape_new(generate_files=False, interactive=False, force=False):
             scraper = SpeciesScraper(html_content, book_name, context_genus)
             scraped_data = scraper.scrape_all()
             
+            species = Species.from_scraped_data(entry, scraped_data, book_name)
+            
             if force:
-                if create_markdown_file(entry, scraped_data, book_name):
+                if species.save():
                     created_count += 1
             else:
-                failed_fields = is_data_valid(scraped_data)
+                failed_fields = species.validate()
                 if not failed_fields:
-                    if create_markdown_file(entry, scraped_data, book_name):
+                    if species.save():
                         created_count += 1
                 else:
                     skipped_count += 1

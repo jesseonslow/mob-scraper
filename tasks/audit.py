@@ -1,3 +1,5 @@
+# mob-scraper/tasks/audit.py
+
 import collections
 import frontmatter
 import re
@@ -5,7 +7,7 @@ import re
 from config import (
     SPECIES_DIR, GENERA_DIR, CONTENT_QUALITY_REPORT_FILENAME
 )
-from core.file_system import get_master_php_urls, index_entries_by_url, index_entries_by_slug
+from core.file_system import get_master_php_urls, index_entries_by_url, index_entries_by_slug, get_all_referenced_genera
 from .reporting import generate_html_report, update_index_page
 from tasks.utils import get_contextual_data
 from reclassification_manager import load_reclassified_urls
@@ -41,6 +43,12 @@ def run_audit():
             creatable_files.append(url)
         else:
             uncreatable_files.append(url)
+            
+    # --- Part 1a: Check for missing genera ---
+    referenced_genera = get_all_referenced_genera()
+    existing_genera_slugs = set(existing_genera_by_slug.keys())
+    missing_genera = sorted(list(referenced_genera - existing_genera_slugs))
+
 
     # --- Part 2: Audit Existing File Quality ---
     print("🔎 Auditing quality of existing content...")
@@ -48,6 +56,9 @@ def run_audit():
     unfinished_files = []
     legacy_links_found = []
     book_data = collections.defaultdict(lambda: collections.defaultdict(int))
+    
+    empty_genera_files = []
+    bad_format_genera_files = []
     
     # Regex to find markdown links ending in .php
     legacy_link_pattern = re.compile(r'\[([^\]]+)\]\(([^)]+\.php)\)')
@@ -75,15 +86,34 @@ def run_audit():
                 
         except Exception as e:
             print(f"  [ERROR] Could not process {file_path.name}: {e}")
+            
+    for file_path in GENERA_DIR.glob('**/*.md*'):
+        if not file_path.is_file(): continue
+        try:
+            with open(file_path, 'r', encoding='utf-8-sig') as f:
+                post = frontmatter.load(f)
+            
+            if not post.content.strip():
+                empty_genera_files.append(file_path.name)
+            
+            if '<' in post.content or '>' in post.content:
+                bad_format_genera_files.append(file_path.name)
+
+        except Exception as e:
+            print(f"  [ERROR] Could not process {file_path.name}: {e}")
+
 
     # --- Part 3: Prepare and Generate Report ---
     summary = {
         "Action Required: Files with Legacy `.php` Links": len(legacy_links_found),
         "Action Required: Files Missing Context": len(uncreatable_files),
+        "Action Required: Missing Genera Files": len(missing_genera),
         "Files Ready to Scrape": len(creatable_files),
         "Total Missing Files": len(missing_urls),
-        "Existing Pages with NO content": len(empty_files),
-        "Existing Pages with UNFINISHED content": len(unfinished_files),
+        "Existing Species Pages with NO content": len(empty_files),
+        "Existing Species Pages with UNFINISHED content": len(unfinished_files),
+        "Existing Genera Pages with NO content": len(empty_genera_files),
+        "Existing Genera Pages with BADLY FORMATTED content": len(bad_format_genera_files),
     }
     
     table_rows = []
@@ -109,15 +139,27 @@ def run_audit():
             "content": f"<p>The following files could not find a parent genus or neighbor. They cannot be generated automatically and require manual investigation.</p><ul>{''.join(f'<li><code>{f}</code></li>' for f in sorted(uncreatable_files))}</ul>"
         },
         {
-            "title": "Existing Content Quality Breakdown", 
+            "title": f"Action Required: {len(missing_genera)} Missing Genera Files",
+            "content": f"<p>The following genera are referenced by species files but do not have a corresponding file in the `genera` directory.</p><ul>{''.join(f'<li><code>{g}</code></li>' for g in missing_genera)}</ul>"
+        },
+        {
+            "title": "Existing Content Quality Breakdown (Species)", 
             "content": table_html
         },
         {
-            "title": f"Files with NO Content ({len(empty_files)} total)", 
+            "title": f"Genera Files with NO Content ({len(empty_genera_files)} total)",
+            "content": f"<ul>{''.join(f'<li><code>{f}</code></li>' for f in sorted(empty_genera_files))}</ul>"
+        },
+        {
+            "title": f"Genera Files with Badly Formatted Content ({len(bad_format_genera_files)} total)",
+            "content": f"<ul>{''.join(f'<li><code>{f}</code></li>' for f in sorted(bad_format_genera_files))}</ul>"
+        },
+        {
+            "title": f"Species Files with NO Content ({len(empty_files)} total)", 
             "content": f"<ul>{''.join(f'<li><code>{f}</code></li>' for f in sorted(empty_files))}</ul>"
         },
         {
-            "title": f"Files with UNFINISHED Content ({len(unfinished_files)} total)", 
+            "title": f"Species Files with UNFINISHED Content ({len(unfinished_files)} total)", 
             "content": f"<ul>{''.join(f'<li><code>{f}</code></li>' for f in sorted(unfinished_files))}</ul>"
         },
         {

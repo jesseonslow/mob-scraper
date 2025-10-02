@@ -129,7 +129,6 @@ def build_legacy_to_new_url_map():
             
             legacy_url = post.metadata.get('legacy_url')
             if legacy_url:
-                # --- FIX: Normalize URL path to lowercase for matching ---
                 source_path = urlparse(legacy_url.lower()).path
                 subfolder = md_path.parent.name
                 destination_path = f"/{subfolder}/{md_path.stem}"
@@ -140,46 +139,22 @@ def build_legacy_to_new_url_map():
     print(f"  -> Successfully mapped {len(url_map)} URLs.")
     return url_map
 
-def create_markdown_file(entry_data: dict, scraped_data: dict, book_name: str):
+def get_all_referenced_genera():
     """
-    Creates and saves a new markdown file for a species from scraped data.
+    Scans all species files and returns a set of all unique 'genus' slugs.
     """
-    url = entry_data['url']
-    neighbor_data = entry_data['neighbor_data']
-    
-    raw_genus = scraped_data.get('genus')
-    
-    clean_genus = ""
-    if raw_genus:
-        clean_genus = re.sub(r'[^a-z]', '', raw_genus.strip().lower())
-
-    name_for_slug = scraped_data.get('name', 'unknown').lower().replace('sp. ', 'sp-').replace(' ', '-').replace('?', '').replace('.', '')
-    slug = f"{clean_genus.replace(' ', '-')}-{name_for_slug}"
-    filepath = config.SPECIES_DIR / f"{slug}.md"
-    
-    if filepath.exists():
-        print(f"  -> ℹ️ SKIPPING: File already exists at {filepath.name}")
-        return
-
-    new_metadata = {
-        'name': scraped_data.get('name'),
-        'author': scraped_data.get('author'),
-        'legacy_url': url,
-        'book': book_name,
-        'family': neighbor_data.get('family'),
-        'subfamily': neighbor_data.get('subfamily'),
-        'tribe': neighbor_data.get('tribe'),
-        'genus': clean_genus,
-        'group': neighbor_data.get('group'),
-        'taxonomic_status': scraped_data.get('taxonomic_status', []),
-        'plates': scraped_data.get('plates', []),
-        'genitalia': scraped_data.get('genitalia', []),
-        'misc_images': scraped_data.get('misc_images', []),
-        'citations': []
-    }
-    
-    post = frontmatter.Post(content=scraped_data.get('body_content', ''))
-    
-    post.metadata = {k: v for k, v in new_metadata.items() if v is not None}
-    
-    save_markdown_file(post, filepath)
+    print("Finding all referenced genera from species files...")
+    referenced_genera = set()
+    for md_path in SPECIES_DIR.glob('**/*.md*'):
+        if not md_path.is_file():
+            continue
+        try:
+            with open(md_path, 'r', encoding='utf-8-sig') as f:
+                post = frontmatter.load(f)
+            genus = post.metadata.get('genus')
+            if genus:
+                referenced_genera.add(genus)
+        except Exception:
+            continue
+    print(f"Found {len(referenced_genera)} unique referenced genera.")
+    return referenced_genera

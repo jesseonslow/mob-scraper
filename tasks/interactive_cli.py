@@ -4,7 +4,6 @@ from bs4 import BeautifulSoup
 import config
 from reclassification_manager import add_reclassified_url
 from core.parser import parse_html_with_rules
-from core.file_system import update_config_file
 from core.processing import correct_text_spacing
 from core.selector_finder import suggest_selectors
 from tasks.utils import get_book_from_url
@@ -200,14 +199,16 @@ def run_interactive_session(entry_data, existing_rules=None, failed_fields=None)
             "genitalia": genitalia,
             "misc_images": misc_images
         })
-
-        new_failed_fields = is_data_valid(final_data)
+        
+        # Create a Species instance to use its validation method
+        species = Species.from_scraped_data(entry_data, final_data, book_name)
+        new_failed_fields = species.validate()
 
         if not new_failed_fields:
             print("✅ Confidence check passed!")
-            print(f"Applying new rules produces:\n  - Name: {final_data.get('name')}\n  - Genus: {final_data.get('genus')}\n  - Author: {final_data.get('author')}")
+            print(f"Applying new rules produces:\n  - Name: {species.name}\n  - Genus: {species.genus}\n  - Author: {species.author}")
             
-            body_snippet = final_data.get('body_content', '').strip()
+            body_snippet = species.body_content.strip()
             print("  - Content Preview:")
             print("---")
             print(f"{body_snippet[:200]}...")
@@ -216,10 +217,12 @@ def run_interactive_session(entry_data, existing_rules=None, failed_fields=None)
 
             choice = input("\nSave these new rules to config.py? [Y/n]: ").lower().strip()
             if choice in ('y', 'yes', ''):
-                update_config_file(book_name, confirmed_rules)
+                # Use the manager to update and save the rules
+                config_manager.update_rules_for_book(book_name, confirmed_rules)
+                
                 save_choice = input("Rules saved. Save this scraped file now? [Y/n]: ").lower().strip()
                 if save_choice in ('y', 'yes', ''):
-                    create_markdown_file(entry_data, final_data, book_name)
+                    species.save()
                     return 'rules_updated_and_file_saved'
                 return 'rules_updated'
             else:
